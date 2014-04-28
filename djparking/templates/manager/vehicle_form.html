@@ -1,0 +1,70 @@
+{% comment%}
+    Parent object uses "record" as the current row in the record set we are iterating over.
+{% endcomment %}
+
+<style type="text/css">
+    form img {width:15px;padding-left:10px;}
+</style>
+
+<form action="." method="post">
+    <input type="hidden" name="permitID" data-permit="{{record.permitId}}" data-student="{{record.id}}" value="{% if record.permitId %}{{record.permitId}}{% endif %}" />
+    <input type="hidden" name="initialYear" data-permit="{{record.permitId}}" data-student="{{record.id}}" value="{% if record.model_yr %}{{record.model_yr}}{% endif %}" />
+    <input type="hidden" name="initialMake" data-permit="{{record.permitId}}" data-student="{{record.id}}" value="{% if record.make %}{{record.make}}{% endif %}" />
+    <input type="hidden" name="initialModel" data-permit="{{record.permitId}}" data-student="{{record.id}}" value="{% if record.model %}{{record.model}}{% endif %}" />
+    <div class="row">
+        <select name="lot" data-permit="{{record.permitId}}" data-student="{{record.id}}">
+            <option value=""></option>
+            {% for lot in lots %}
+                <option value="{{lot.lotcode}}"{% ifequal lot.lotcode record.lotcode %} selected="selected"{% endifequal %}>{{lot.txt}}</option>
+            {% endfor %}
+        </select>
+        {% comment %}
+        <select name="lotloctn" data-permit="{{record.permitId}}" data-student="{{record.id}}">
+            <option value="{{record.lotloctn}}">{{record.lotloctn}}</option>
+        </select>
+        {% endcomment %}
+        <select name="sticker" data-permit="{{record.permitId}}" data-student="{{record.id}}">
+            <option value="{{record.permit_txt}}">{{record.permit_txt}}</option>
+        </select>
+        <input type="text" name="license" data-permit="{{record.permitId}}" data-student="{{record.id}}" value="{% if record.license %}{{record.license}}{% endif %}" size="7" maxlength="8" />
+        <select name="st_plate" data-permit="{{record.permitId}}" data-student="{{record.id}}">
+            <option value=""></option>
+            {% for state in states %}
+                <option value="{{state.st}}"{% ifequal state.st record.st_plate %} selected="selected"{% endifequal %}>{{state.st}}</option>
+            {% endfor %}
+        </select>
+        <select name="carYear" data-permit="{{record.permitId}}" data-student="{{record.id}}" data-placeholder="Year" class="chosenDDL">
+            <option value=""></option>
+            {% for year in carYears reversed %}
+                <option value="{{year}}"{% ifequal year record.model_yr %} selected="selected"{% endifequal %}>{{year}}</option>
+            {% endfor %}
+        </select>
+        <select name="carMake" data-permit="{{record.permitId}}" data-student="{{record.id}}" data-placeholder="Make" class="chosenDDL">
+            {% comment %}
+            <option value=""></option>
+            {% for make in carMakes %}
+                <option value="{{make.make_code}}"{% ifequal make.make_code record.make %} selected="selected"{% endifequal %}>{{make.make_code}}</option>
+            {% endfor %}
+            {% endcomment %}
+        </select>
+        <select name="carModel" data-permit="{{record.permitId}}" data-student="{{record.id}}" data-placeholder="Model" class="chosenDDL">
+            {% comment %}
+            <option value=""></option>
+            {% for model in carModels %}
+                <option value="{{model.model_code}}"{% ifequal model.model_code record.model %} selected="selected"{% endifequal %}>{{model.model_code}}</option>
+            {% endfor %}
+            {% endcomment %}
+        </select>
+        {% if record.permitId %}
+            <img src="http://www.veryicon.com/icon/png/Application/Toolbar%20Icons/Save.png" class="iconSave" alt="Save Changes" title="Save Changes" />
+            <img src="https://cdn1.iconfinder.com/data/icons/musthave/256/Remove.png" class="iconDelete" alt="Delete" title="Delete" />
+        {% else %}
+            <img src="http://a.dryicons.com/images/icon_sets/simplistica/png/128x128/add.png" class="iconAdd" alt="Add New" title="Add New" />
+        {% endif %}
+    </div>
+    {% if record.permitcomment %}
+    <div class="row">
+        <label>Permit Comment:</label>{{record.permitcomment}}
+    </div>
+    {% endif %}
+</form>

@@ -1,0 +1,106 @@
+<style type="text/css">
+    form img {width:15px;padding-left:10px;}
+</style>
+
+{% for vehicle in person.vehicle %}
+    <form action="../update/" method="post">
+        {% csrf_token %}
+        <input type="hidden" name="veh_no" data-veh="{{vehicle.veh_no}}" data-student="{{person.id}}" value="{{vehicle.veh_no}}" />
+        
+        <div class="row">
+            <select name="lot" data-veh="{{vehicle.veh_no}}" data-student="{{person.id}}">
+                <option value=""></option>
+                {% for lot in lots %}
+                    <option value="{{lot.lotcode}}"{% ifequal lot.lotcode vehicle.lotcode %} selected="selected"{% endifequal %}>{{lot.txt}}</option>
+                {% endfor %}
+            </select>
+            <select name="sticker" data-veh="{{vehicle.veh_no}}" data-student="{{person.id}}">
+                {% for sticker in vehicle.stickers %}
+                    <option value="{{sticker.permit_txt}}"{% ifequal vehicle.permit_txt sticker.permit_txt %} selected="selected"{% endifequal %}>{{sticker.permit_txt}}</option>
+                {% endfor %}
+            </select>
+            <input type="text" name="license" data-veh="{{vehicle.veh_no}}" data-student="{{person.id}}" value="{% if vehicle.license %}{{vehicle.license}}{% endif %}" size="7" maxlength="8" placeholder="License" />
+            <select name="st_plate" data-veh="{{vehicle.veh_no}}" data-student="{{person.id}}">
+                <option value=""></option>
+                {% for state in states %}
+                    <option value="{{state.st}}"{% ifequal state.st vehicle.st_plate %} selected="selected"{% endifequal %}>{{state.st}}</option>
+                {% endfor %}
+            </select>
+            <input type="text" name="active_date" class="datepicker" value="{% if vehicle.active_date %}{{vehicle.active_date}}{% endif %}" size="8" placeholder="Active Date" />
+            <input type="text" name="inactive_date" class="datepicker" value="{% if vehicle.inactive_date %}{{vehicle.inactive_date}}{% endif %}" size="8" placeholder="Inactive Date" />
+        </div>
+        <div class="row">
+            <select name="carYear" data-veh="{{vehicle.veh_no}}" data-student="{{person.id}}" data-placeholder="Year" class="chosenDDL">
+                <option value=""></option>
+                {% for year in carYears reversed %}
+                    <option value="{{year}}"{% ifequal year vehicle.model_yr %} selected="selected"{% endifequal %}>{{year}}</option>
+                {% endfor %}
+            </select>
+            <select name="carMake" data-veh="{{vehicle.veh_no}}" data-student="{{person.id}}" data-placeholder="Make" class="chosenDDL">
+                <option value=""></option>
+                {% for make in vehicle.makes %}
+                    <option value="{{make.make_code}}"{% ifequal make.make_code vehicle.make %} selected="selected"{% endifequal %}>{{make.make_code}}</option>
+                {% endfor %}
+            </select>
+            <select name="carModel" data-veh="{{vehicle.veh_no}}" data-student="{{person.id}}" data-placeholder="Model" class="chosenDDL">
+                <option value=""></option>
+                {% for model in vehicle.models %}
+                    <option value="{{model.model_code}}"{% ifequal model.model_code vehicle.model %} selected="selected"{% endifequal %}>{{model.model_code}}</option>
+                {% endfor %}
+            </select>
+            <img src="http://www.veryicon.com/icon/png/Application/Toolbar%20Icons/Save.png" class="iconSave" alt="Save Changes" title="Save Changes" />
+            <img src="https://cdn1.iconfinder.com/data/icons/musthave/256/Remove.png" class="iconDelete" alt="Delete" title="Delete" />
+        </div>
+        {% if vehicle.permitcomment %}
+        <div class="row">
+            <label>Permit Comment:</label>{{vehicle.permitcomment}}
+        </div>
+        {% endif %}
+    </form>
+{% endfor %}
+<form action="../create/" method="post">
+    {% csrf_token %}
+    <input type="hidden" name="studentId" value="{{person.id}}" />
+    <input type="hidden" name="acadYear" value="{{search.acadYear}}" />
+    <input type="hidden" name="takeAction" value="update" />
+    <div class="row">
+        <select name="lot" data-student="{{person.id}}" data-veh="0">
+            <option value=""></option>
+            {% for lot in lots %}
+                <option value="{{lot.lotcode}}">{{lot.txt}}</option>
+            {% endfor %}
+        </select>
+        <select name="sticker" data-student="{{person.id}}" data-veh="0">
+        </select>
+        <input type="text" name="license" size="7" maxlength="8" placeholder="License" />
+        <select name="st_plate" data-veh="0">
+            <option value=""></option>
+            {% for state in states %}
+                <option value="{{state.st}}">{{state.st}}</option>
+            {% endfor %}
+        </select>
+        <select name="carYear" data-student="{{person.id}}" data-veh="0" data-placeholder="Year" class="chosenDDL">
+            <option value=""></option>
+            {% for year in carYears reversed %}
+                <option value="{{year}}">{{year}}</option>
+            {% endfor %}
+        </select>
+        <select name="carMake" data-student="{{person.id}}" data-veh="0" data-placeholder="Make" class="chosenDDL">
+            <option value=""></option>
+            {% for make in vehicle.makes %}
+                <option value="{{make.make_code}}">{{make.make_code}}</option>
+            {% endfor %}
+        </select>
+        <select name="carModel" data-student="{{person.id}}" data-veh="0" data-placeholder="Model" class="chosenDDL">
+            <option value=""></option>
+            {% for model in vehicle.models %}
+                <option value="{{model.model_code}}">{{model.model_code}}</option>
+            {% endfor %}
+        </select>
+        <img src="http://a.dryicons.com/images/icon_sets/simplistica/png/128x128/add.png" class="iconAdd" alt="Add New" title="Add New" />
+    </div>
+    <div class="row">
+        <label>Permit Comment:</label>
+        <textarea name="permitComment" data-student="{{person.id}}" data-veh="0" rows="2" cols="45"></textarea>
+    </div>
+</form>
