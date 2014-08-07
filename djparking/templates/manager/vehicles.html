@@ -1,106 +1,130 @@
-<style type="text/css">
-    form img {width:15px;padding-left:10px;}
-</style>
-
 {% for vehicle in person.vehicle %}
-    <form action="../update/" method="post">
+    {% comment %}<form action="../{% ifequal vehicle.veh_no 0 %}create{% else %}update{% endifequal %}/" method="post" class="{% ifequal vehicle.veh_no 0 %}newForm {% endifequal %}vehicleForm"> {% endcomment %}
+    {% ifequal vehicle.veh_no 0 %}
+        {% url 'manager_create' as form_url %}
+    {% else %}
+        {% url 'manager_update' as form_url %}
+    {% endifequal %}
+        
+    <form action="{{form_url}}" method="post" class="{% ifequal vehicle.veh_no 0 %}newForm {% endifequal %}vehicleForm">
         {% csrf_token %}
         <input type="hidden" name="veh_no" data-veh="{{vehicle.veh_no}}" data-student="{{person.id}}" value="{{vehicle.veh_no}}" />
-        
-        <div class="row">
-            <select name="lot" data-veh="{{vehicle.veh_no}}" data-student="{{person.id}}">
-                <option value=""></option>
-                {% for lot in lots %}
-                    <option value="{{lot.lotcode}}"{% ifequal lot.lotcode vehicle.lotcode %} selected="selected"{% endifequal %}>{{lot.txt}}</option>
-                {% endfor %}
-            </select>
-            <select name="sticker" data-veh="{{vehicle.veh_no}}" data-student="{{person.id}}">
-                {% for sticker in vehicle.stickers %}
-                    <option value="{{sticker.permit_txt}}"{% ifequal vehicle.permit_txt sticker.permit_txt %} selected="selected"{% endifequal %}>{{sticker.permit_txt}}</option>
-                {% endfor %}
-            </select>
-            <input type="text" name="license" data-veh="{{vehicle.veh_no}}" data-student="{{person.id}}" value="{% if vehicle.license %}{{vehicle.license}}{% endif %}" size="7" maxlength="8" placeholder="License" />
-            <select name="st_plate" data-veh="{{vehicle.veh_no}}" data-student="{{person.id}}">
-                <option value=""></option>
-                {% for state in states %}
-                    <option value="{{state.st}}"{% ifequal state.st vehicle.st_plate %} selected="selected"{% endifequal %}>{{state.st}}</option>
-                {% endfor %}
-            </select>
-            <input type="text" name="active_date" class="datepicker" value="{% if vehicle.active_date %}{{vehicle.active_date}}{% endif %}" size="8" placeholder="Active Date" />
-            <input type="text" name="inactive_date" class="datepicker" value="{% if vehicle.inactive_date %}{{vehicle.inactive_date}}{% endif %}" size="8" placeholder="Inactive Date" />
-        </div>
-        <div class="row">
+        <input type="hidden" name="permit_no" data-veh="{{vehicle.veh_no}}" value="{{vehicle.permitId}}" />
+        <input type="hidden" name="studentId" value="{{person.id}}" />
+        <input type="hidden" name="acadYear" value="{{search.acadYear}}" />
+        <!-- Search fields, to mimic request -->
+        <input type="hidden" name="searchText" value="{{search.text}}" />
+        <input type="hidden" name="searchID" value="{{person.id}}" />
+        <input type="hidden" name="academicYear" value="{{search.acadYear}}" />
+        <input type="hidden" name="takeAction" value="update" />
+
+        <h3>Vehicle Information {% ifnotequal vehicle.veh_no 0 %}(#{{vehicle.veh_no}}){% endifnotequal %}</h3>
+        <div class="infoField">
             <select name="carYear" data-veh="{{vehicle.veh_no}}" data-student="{{person.id}}" data-placeholder="Year" class="chosenDDL">
                 <option value=""></option>
                 {% for year in carYears reversed %}
                     <option value="{{year}}"{% ifequal year vehicle.model_yr %} selected="selected"{% endifequal %}>{{year}}</option>
                 {% endfor %}
             </select>
+        </div>
+        <div class="infoField">
             <select name="carMake" data-veh="{{vehicle.veh_no}}" data-student="{{person.id}}" data-placeholder="Make" class="chosenDDL">
                 <option value=""></option>
                 {% for make in vehicle.makes %}
                     <option value="{{make.make_code}}"{% ifequal make.make_code vehicle.make %} selected="selected"{% endifequal %}>{{make.make_code}}</option>
                 {% endfor %}
             </select>
+        </div>
+        <div class="infoField">
             <select name="carModel" data-veh="{{vehicle.veh_no}}" data-student="{{person.id}}" data-placeholder="Model" class="chosenDDL">
                 <option value=""></option>
                 {% for model in vehicle.models %}
                     <option value="{{model.model_code}}"{% ifequal model.model_code vehicle.model %} selected="selected"{% endifequal %}>{{model.model_code}}</option>
                 {% endfor %}
             </select>
-            <img src="http://www.veryicon.com/icon/png/Application/Toolbar%20Icons/Save.png" class="iconSave" alt="Save Changes" title="Save Changes" />
-            <img src="https://cdn1.iconfinder.com/data/icons/musthave/256/Remove.png" class="iconDelete" alt="Delete" title="Delete" />
         </div>
-        {% if vehicle.permitcomment %}
+        <div class="infoField">
+            <input type="text" name="license" data-veh="{{vehicle.veh_no}}" data-student="{{person.id}}" value="{% if vehicle.license %}{{vehicle.license}}{% endif %}" size="7" maxlength="8" placeholder="License" />
+        </div>
+        <div class="infoField">
+            <select name="st_plate" data-veh="{{vehicle.veh_no}}" data-student="{{person.id}}" data-placeholder="State" class="chosenDDL">
+                <option value=""></option>
+                {% for state in states %}
+                    <option value="{{state.st}}"{% ifequal state.st vehicle.st_plate %} selected="selected"{% endifequal %}>{{state.st}}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <h3>Permit Information</h3>
+        <div class="infoField">
+            <select name="lot" data-veh="{{vehicle.veh_no}}" data-student="{{person.id}}" data-placeholder="Lot" class="chosenDDL">
+                <option value=""></option>
+                {% for lot in lots %}
+                    <option value="{{lot.lotcode}}"{% ifequal lot.lotcode vehicle.lotcode %} selected="selected"{% endifequal %}>{{lot.txt}}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="infoField">
+            <div>
+                <select name="sticker" data-veh="{{vehicle.veh_no}}" data-student="{{person.id}}" data-placeholder="Permit" class="chosenDDL">
+                    <option value=""></option>
+                    {% for sticker in vehicle.stickers %}
+                        <option value="{{sticker.permit_txt}}"{% ifequal vehicle.permit_txt sticker.permit_txt %} selected="selected"{% endifequal %}>{{sticker.permit_txt}}</option>
+                    {% endfor %}
+                </select>
+                <input type="hidden" name="initialSticker" data-veh="{{vehicle.veh_no}}" value="{{vehicle.permit_txt}}" />
+            </div>
+        </div>
+        <div class="infoField">
+            <input type="text" name="active_date" class="datepicker" data-veh="{{vehicle.veh_no}}" data-student="{{person.id}}" value="{% if vehicle.active_date %}{{vehicle.active_date}}{% else %}{{present|date:"m/d/Y"}}{% endif %}" size="8" placeholder="Active Date" />
+        </div>
+        <div class="infoField">
+            <input type="text" name="inactive_date" class="datepicker" data-veh="{{vehicle.veh_no}}" data-student="{{person.id}}" value="{% if vehicle.inactive_date %}{{vehicle.inactive_date}}{% endif %}" size="8" placeholder="Inactive Date" />
+        </div>
+        
+        {% ifnotequal vehicle.veh_no 0 %}
+            <div class="permitChangeBlock">
+                <h3>Original Permit</h3>
+                <div class="infoField">
+                    {{vehicle.lotcode}}
+                </div>
+                <div class="infoField">
+                    {{vehicle.permit_txt}}
+                </div>
+                <div class="infoField">
+                    {{vehicle.active_date}}
+                </div>
+                <div class="infoField">
+                    <input type="text" name="original_inactive_date" class="datepicker" data-veh="{{vehicle.veh_no}}" data-student="{{person.id}}" value="{% if vehicle.inactive_date %}{{vehicle.inactive_date}}{% endif %}" size="8" placeholder="Inactive Date" />
+                </div>
+                <div class="infoField">
+                    <select name="permitStatus" data-veh="{{vehicle.veh_no}}" data-student="{{person.id}}" class="chosenDDL">
+                        <option value="">Available</option>
+                        <option value="A">Assigned</option>
+                        <option value="S">Surrender</option>
+                        <option value="L">Lost</option>
+                        <option value="D">Damaged</option>
+                    </select>
+                </div>
+            </div>
+        {% endifnotequal %}
+        {% comment %}
+        <div class="infoField">
+            {% ifnotequal vehicle.veh_no 0 %}<a class="removePermit">Remove Permit</a>{% endifnotequal %}
+        </div>
+        {% endcomment %}
+        {% comment %}
+        <div class="infoField">
+            {% ifnotequal vehicle.veh_no 0 %}<input type="image" src="https://cdn1.iconfinder.com/data/icons/musthave/256/Remove.png" class="iconDelete" alt="Delete Permit" title="Delete Permit" />{% endifnotequal %}
+        </div>
+        {% endcomment %}
         <div class="row">
-            <label>Permit Comment:</label>{{vehicle.permitcomment}}
+            <label style="display:block;">Permit Comment:</label>
+            <textarea name="permitComment" rows="2" cols="45">{% if vehicle.permitcomment %}{{vehicle.permitcomment}}{% endif %}</textarea>
         </div>
-        {% endif %}
+
+        <div class="row">
+            <input type="image" src="http://www.veryicon.com/icon/png/Application/Toolbar%20Icons/Save.png" class="iconSave" alt="Save Changes" title="Save Changes" />
+        </div>
     </form>
 {% endfor %}
-<form action="../create/" method="post">
-    {% csrf_token %}
-    <input type="hidden" name="studentId" value="{{person.id}}" />
-    <input type="hidden" name="acadYear" value="{{search.acadYear}}" />
-    <input type="hidden" name="takeAction" value="update" />
-    <div class="row">
-        <select name="lot" data-student="{{person.id}}" data-veh="0">
-            <option value=""></option>
-            {% for lot in lots %}
-                <option value="{{lot.lotcode}}">{{lot.txt}}</option>
-            {% endfor %}
-        </select>
-        <select name="sticker" data-student="{{person.id}}" data-veh="0">
-        </select>
-        <input type="text" name="license" size="7" maxlength="8" placeholder="License" />
-        <select name="st_plate" data-veh="0">
-            <option value=""></option>
-            {% for state in states %}
-                <option value="{{state.st}}">{{state.st}}</option>
-            {% endfor %}
-        </select>
-        <select name="carYear" data-student="{{person.id}}" data-veh="0" data-placeholder="Year" class="chosenDDL">
-            <option value=""></option>
-            {% for year in carYears reversed %}
-                <option value="{{year}}">{{year}}</option>
-            {% endfor %}
-        </select>
-        <select name="carMake" data-student="{{person.id}}" data-veh="0" data-placeholder="Make" class="chosenDDL">
-            <option value=""></option>
-            {% for make in vehicle.makes %}
-                <option value="{{make.make_code}}">{{make.make_code}}</option>
-            {% endfor %}
-        </select>
-        <select name="carModel" data-student="{{person.id}}" data-veh="0" data-placeholder="Model" class="chosenDDL">
-            <option value=""></option>
-            {% for model in vehicle.models %}
-                <option value="{{model.model_code}}">{{model.model_code}}</option>
-            {% endfor %}
-        </select>
-        <img src="http://a.dryicons.com/images/icon_sets/simplistica/png/128x128/add.png" class="iconAdd" alt="Add New" title="Add New" />
-    </div>
-    <div class="row">
-        <label>Permit Comment:</label>
-        <textarea name="permitComment" data-student="{{person.id}}" data-veh="0" rows="2" cols="45"></textarea>
-    </div>
-</form>

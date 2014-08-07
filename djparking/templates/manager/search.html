@@ -11,17 +11,55 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
 <html lang="en">
 	<head>
+        <title>Carthage Parking Administration</title>
 		<meta charset="utf-8" />
-		<link rel="stylesheet" type="text/css" href="//ajax.googleapis.com/ajax/libs/jqueryui/1.10.4/themes/smoothness/jquery-ui.css" />
+
+        <link href="//fonts.googleapis.com/css?family=Open+Sans:300,400,600,700" type="text/css" rel="stylesheet">
+        <link href="//www.carthage.edu/themes/korra/assets/css/master.css" type="text/css" rel="stylesheet" />
+        <link href="//www.carthage.edu/themes/shared/css/icons.css" type="text/css" rel="stylesheet" />
+        <link href="//www.carthage.edu/static/vendor/dashboard/font-awesome/css/font-awesome.min.css" type="text/css" rel="stylesheet" />
+        <link href="//www.carthage.edu/themes/shared/css/forms.css" type="text/css" rel="stylesheet" />
+        <link href="//www.carthage.edu/themes/shared/css/tables.css" type="text/css" rel="stylesheet" />
+        <!--- jQuery and jQueryUI --->
+        <link href="//ajax.googleapis.com/ajax/libs/jqueryui/1.10.4/themes/smoothness/jquery-ui.css" rel="stylesheet" />
+        <!--- <link href="//www.carthage.edu/static/vendor/jquery/ui/datepicker/css/smoothness/jquery-ui-1.10.4.custom.min.css" rel="stylesheet" type="text/css" /> --->
+        <!--- End of jQuery* styles --->
         <link rel="stylesheet" type="text/css" href="https://www.carthage.edu/housing/scripts/chosen/chosen.css" />
-		<script type="text/javascript" src="//ajax.googleapis.com/ajax/libs/jquery/2.1.0/jquery.min.js"></script>
-		<script type="text/javascript" src="//ajax.googleapis.com/ajax/libs/jqueryui/1.10.4/jquery-ui.min.js"></script>
+        <!--[if lt IE 9]>
+            <script src="//www.carthage.edu/themes/korra/assets/js/html5shiv.js" type="text/javascript"></script>
+        <![endif]-->
+        <script src="//ajax.googleapis.com/ajax/libs/jquery/1.11.0/jquery.min.js" type="text/javascript"></script>
+        <script src="//ajax.googleapis.com/ajax/libs/jqueryui/1.10.4/jquery-ui.min.js"></script>
+
 		<script type="text/javascript" src="https://www.carthage.edu/housing/scripts/chosen/chosen.jquery.min.js"></script>
         <script type="text/javascript" src="https://www.carthage.edu/housing/scripts/utility.js"></script>
+
+        <script src="//www.carthage.edu/themes/korra/assets/js/jquery.cycle2.min.js" type="text/javascript"></script>
+        <script src="//www.carthage.edu/themes/korra/assets/fancybox/jquery.fancybox.js" type="text/javascript"></script>
+        <script src="//www.carthage.edu/themes/korra/assets/js/jquery.cycle2.carousel.min.js" type="text/javascript"></script>
+        <script src="//www.carthage.edu/themes/korra/assets/js/master.js" type="text/javascript"></script>
+
         <script type="text/javascript">
+            //Associate active_date and inactive_date datepicker controls with one another (setting caps on the available dates for each control)
+            function relateDatePickers($obj, selectedDate){
+                //Determine whether the current control is the active or inactive date
+                var isActive = new RegExp('^active_date$').test($obj.attr('name'));
+                
+                //Based on the current control, set the jQuery selector (otherField) and the datepicker option setting (datepickerOption)
+                var otherField = isActive ? 'inactive_date' : 'active_date',
+                    datepickerOption = isActive ? 'minDate' : 'maxDate';
+                
+                $('input[name="' + otherField + '"][data-veh="' + $obj.data('veh') + '"]').datepicker('option', datepickerOption, selectedDate);
+            }
+
             $(document).ready(function(){
                 var LOADING_MESSAGE = 'Loading...';
                 
+                //Because of the quirk in the default autocomplete, we add a button that will not cause the results menu to collapse, even if the control loses focus
+                $('input[name="manualSearch"]').click(function(){
+                    $('#search').autocomplete('search', $('#search').val());
+                });
+
                 //Initialize autocomplete search box
                 $('#search').autocomplete({
                     source:'../ajax/search/' + $('select[name="academicYear"]').val() + '/',
@@ -30,43 +68,125 @@
                         $('#search').val(ui.item.value);
                         $('input[name="searchID"]').val(ui.item.id);
                         $('#mainSearchForm').submit();
+                    },
+                    response:function(event, ui){
+                        if(ui.content.length === 0){
+                            alert('No matches found');
+                        }
                     }
                 });
-                
+
                 $('.iconSave').click(function(){
-                    $(this).parentsUntil('form').parent().submit();
+                    $(this).parents('form.vehicleForm').submit();
                 });
-                $('.iconDelete').click(function() {
-                    $(this).parentsUntil('form').find('input[name="takeAction"]').val('delete');
-                    $(this).parentsUntil('form').parent().submit();
-                });
-                $('.iconAdd').click(function() { alert('Add a new vehicle record'); });
+                $('.removePermit').click(function(e){
+                    e.preventDefault();
+                    $(this).parents('form.vehicleForm').find('input[name="takeAction"]').val('delete');
+                    $(this).parents('form.vehicleForm').submit();
+                }).button();
                 
+                $('.iconAdd').click(function() {
+                    alert('Add a new vehicle record');
+                    var errors = '';
+                    errors += $('select[name="lot"][data-veh="0"]').val() == '' ? 'Select a lot\n' : '';
+                    if(errors.length > 0){
+                        alert('Please correct the following error(s):\n\n' + errors);
+                        return false;
+                    }
+                    return true;
+                });
+
+                //When adding a new vehicle record, validate a minimum number of fields
+                $('.newForm').submit(function(e){
+                    //Create the list of fields to validate
+                    var fieldList = ['carYear','carMake','carModel','license','st_plate'];
+                    $.each(fieldList, function(index, val){
+                        //Get the object
+                        $field = $('[name="' + val + '"][data-veh="0"]');
+                        //Remove the error class (if it exists)
+                        $field.parent('div.infoField').removeClass('has-error');
+                        //If invalid value, attach the error class to the parent <div>
+                        if($field.val() == '' || $field.val() == null){
+                            $field.parent('div.infoField').addClass('has-error');
+                        }
+                    });
+                    //Did the form validate with no errors?
+                    return $('.has-error').length == 0;
+                });
+
                 //Initialize chosen drop downs
                 $('.chosenDDL').chosen();
-				$('.datepicker').datepicker();
-                
+
+                //Attach jQueryUI datepicker to the active and inactive date controls
+                $('input[name="active_date"], input[name="inactive_date"]').datepicker({
+                    //After closing the calendar popup...
+                    onClose: function(selectedDate){
+                        //Link active date and inactive date controls for each vehicle record
+                        relateDatePickers($(this), selectedDate);
+                    }
+                }).each(function(){
+                    //Link active date and inactive date controls for each vehicle record
+                    relateDatePickers($(this), $(this).val());
+                });
+                $('input[name="original_inactive_date"]').datepicker({
+                    
+                });
+
                 $('select[name="lot"]').each(function(){
                     var thisVeh = $(this).data('veh');
                     var selLot = 'select[name="lot"][data-veh="' + thisVeh + '"]',
                         selPermit = 'select[name="sticker"][data-veh="' + thisVeh + '"]';
 
+                    //Initialize the "onchange" event for each Lot select box
                     $(selLot).change(function(){
+                        //Clear the values in the permit dropdown
                         clearSelect(selPermit);
+                        //Put a loading placeholder in the permit select box
                         loadSelect(selPermit, LOADING_MESSAGE, false);
-                        
+                        //Trigger the update event for the Chosen plugin select boxes
+                        $(selPermit).trigger('liszt:updated');
+
                         $.getJSON('../ajax/permits/' + $('select[name="academicYear"]').val() + '/' + $(selLot).val() + '/', function(){
                             console.log('Beginning permit JSON request.');
                         }).done(function(permitList){
+                            //Remove the loading placeholder
                             clearSelect(selPermit);
+                            //Update the list of permits with the results of the ajax call
                             loadSelect(selPermit, permitList, true);
+                            //Trigger the update event for the Chosen plugin
+                            $(selPermit).trigger('liszt:updated');
                         }).fail(function(jqxhr, textStatus, error){
+                            //If something goes wrong, let the user know and log the error to the console for debugging
                             alert('Unable to retrieve the list of Permits. Please try again.');
                             console.log('Request failed: ' + textStatus + ', ' + error);
                         });
                     });
                 });
-                
+
+                //When the user changes the parking sticker dropdown
+                $('select[name="sticker"]').change(function(){
+                    //Get the veh_no
+                    var veh_attr = '[data-veh="' + $(this).data('veh') + '"]';
+                    //If the selected sticker has been changed from when the page loaded, show the "permit status" dropdown. Otherwise, hide the dropdown.
+                    /*
+                    $('select[name="permitStatus"]' + veh_attr).parent('div').toggle(
+                        $('select[name="sticker"]' + veh_attr).val() != $('input[name="initialSticker"]' + veh_attr).val()
+                    );
+                    */
+                    $('select[name="permitStatus"]' + veh_attr).parents('form').find('.permitChangeBlock').toggle(
+                        $('select[name="sticker"]' + veh_attr).val () != $('input[name="initialSticker"]' + veh_attr).val()
+                    );
+                });
+
+                //Hide all the "permit status" dropdowns when the page loads.
+                //$('select[name="permitStatus"]').parent('div').hide();
+                $('.permitChangeBlock').hide();
+
+                $('input[name="license"]').blur(function(){
+                    //Only allow numbers, letters, and spaces. Remove all other punctuation and symbols.
+                    $(this).val($(this).val().replace(/[^\d\sa-z]/gi, '').toUpperCase());
+                });
+
                 //Loop through each Year select box
                 $('select[name="carYear"]').each(function(){
                     //Identify the veh_no value for the current row
@@ -83,7 +203,7 @@
                         if($(selYear + ' :selected').not(selYear + ' :first')){
                             //Put a loading placeholder in the make select box
                             loadSelect(selMake, LOADING_MESSAGE, false);
-                            //Trigger the update event for the Chosen plugin select boxes.
+                            //Trigger the update event for the Chosen plugin select boxes
                             $(selMake + ',' + selModel).trigger('liszt:updated');
 
                             $.getJSON('../ajax/makes/' + $(this).val() + '/', function(){
@@ -96,7 +216,7 @@
                                 //Trigger the update event for the Chosen plugin
                                 $(selMake).trigger('liszt:updated');
                             }).fail(function(jqxhr, textStatus, error){
-                                //If something goes wrong, let the user know and log the error to the console for debugging.
+                                //If something goes wrong, let the user know and log the error to the console for debugging
                                 alert('Unable to retrieve the list of Makes. Please try again.');
                                 console.log('Request failed: ' + textStatus + ', ' + error);
                             });
@@ -135,24 +255,54 @@
                             console.log('Request failed: ' + textStatus + ', ' + error);
                         });
                     });
+                    
+                    if($(this).val() == 'Motorcycle'){
+                        
+                    }
                 });
             });
         </script>
         <style type="text/css">
-            body {width:790px;margin:0px auto;padding:0px;font-size:12px;}
-            input, select {font-size:12px;}
-            .buffer {width:585px;float:left;}
-            .clear {clear:both;}
-            .summary {float:right;width:200px;}
+            body {min-width:900px;max-width:1200px;margin:0px auto;/*padding:0px;font-size:12px;*/}
+            .buffer {width:80%;float:left;}
+            .personDetail {padding-left:10px;margin-top:15px;}
+                .personDetail h3 {padding-top:10px;clear:both;}
+                .personDetail .infoField {float:left;width:140px;}
+            .row {clear:both;}
+            .summary {width:19%;float:right;}
             .summary h3 {text-align:center;}
-            .summary table {border-collapse:collapse;}
-            select[name="carYear"] {width:60px;}
-            select[name="carMake"] {width:101px;}
-            select[name="carModel"] {width:115px;}
-            
+            .summary table {border-collapse:collapse;font-size:.85em;width:100%;}
+            .summary table th, .summary table td {padding:5px 0px 0px 5px;}
+
             .ui-autocomplete-loading {
                 background: white url('http://jqueryui.com/resources/demos/autocomplete/images/ui-anim_basic_16x16.gif') right center no-repeat;
             }
+
+            /* Vehicle CSS */
+            form.vehicleForm {
+                clear:both;
+                background-color:#6BA2B8;
+                padding:0px 5px;
+                margin:10px;
+            }
+            form.newForm {background-color:#C5B32F;}
+            div.infoField.has-error {padding:5px;background-color:#CC0000;margin-left:8px;}
+
+            input[type="image"] {width:25px;padding-left:10px;}
+            select[name="lot"], select[name="st_plate"] {width:70px;}
+            select[name="sticker"] {width:120px;}
+            select[name="permitStatus"] {width:100px;}
+            select[name="carYear"] {width:80px;}
+            select[name="carMake"] {width:125px;}
+            select[name="carModel"] {width:115px;}
+            input[name="license"], input[name="active_date"], input[name="inactive_date"] {font-size:13px;}
+
+            /* Buttonset CSS */
+            /*
+            .ui-button-text-only .ui-button-text { font-size:.7em; }
+            */
+            .ui-button-text-only .ui-button-text {padding:.4em;}
+            .ui-widget {font-size:.8em;}
         </style>
     </head>
     <body>
@@ -165,6 +315,7 @@
                         <label>Search:</label>
                         <input type="text" name="searchText" id="search" size="35" value="{{search.text}}" />
                         <input type="hidden" name="searchID" value="{{search.ID}}" />
+                        <input type="button" name="manualSearch" value="Search" />
                     </div>
                     <div class="row">
                         <label>Academic Year:</label>
@@ -178,10 +329,14 @@
             </fieldset>
             {% if isSearched %}
                 {% if person %}
-                    <fieldset>
+                    <fieldset class="personDetail">
                         <legend>{{person.firstname}} {{person.lastname}} Vehicle Management</legend>
-                        <div class="row">
-                            {{person.firstname}} ({{person.id}}) residing in {{person.bldg}}
+                        <h3>User Information</h3>
+                        <div class="infoField">
+                            ID: {{person.id}}
+                        </div>
+                        <div class="infoField">
+                            Residence: {{person.bldg}}
                         </div>
                         {% include "manager/vehicles.html" %}
                     </fieldset>
@@ -193,27 +348,28 @@
                 {{debug}}
             {% endif %}
             
+            {% comment %}
             <style type="text/css">
                 .done {text-decoration:line-through;}
             </style>
             <h2>Questions</h2>
             <ol>
                 <li class="done">If we know the lot, how do we get a list of the available permits? (Add lotcode to prkgstckr_rec)</li>
+                <li class="done">Explain the automated process that assigns permits to a vehicle record. (Not an issue with change to #1)</li>
+				<li class="done">Do we need a search by last name feature or are ID and permit enough? (license plate for security, last name leading to single selection)</li>
+				<li class="done">Is the right way to handle lot costs to decrement them monthly through the year?</li>
                 <li>What changes when a permit is forfeited? (Inactivate prkgprmt_rec [S = Surrender, L = Lost, D=Damaged/Destroyed] and prkgstckr_rec)</li>
                 <li>What happens when we initialize a new year (create new allotment of permits, etc)?</li>
-                <li class="done">Explain the automated process that assigns permits to a vehicle record. (Not an issue with change to #1)</li>
                 <li>Does the Business Office need the ability to specify the inactive date of a vehicle record or can we just automate it to today? (still a question)</li>
 				<li>Are all non-AdultEd permits only good for one year? If so, can we set a default expiration date of August preceding the start of the next academic year?</li>
-				<li class="done">Do we need a search by last name feature or are ID and permit enough? (license plate for security, last name leading to single selection)</li>
 				<li>What (if any) types of reporting would be necessary through these screens?</li>
-				<li class="done">Is the right way to handle lot costs to decrement them monthly through the year?</li>
 				<li>What are the dates for various payments ($75 at start, full amount during sign-up, etc)</li>
 				<li>Possible data model changes:
 					<ol>
 						<li>Drop veh_table, vehcolor_table, vehicle_rec, vehmake_table</li>
-						<li>Create relationship between lot_table and prkgstckr_rec</li>
 						<li>Remove permit_stat from prkgprmt_rec (approved)</li>
-						<li>Create a rate table linked to lot_table</li>
+						<li class="done">Create relationship between lot_table and prkgstckr_rec</li>
+						<li class="done">Create a rate table linked to lot_table</li>
 					</ol>
 				</li>
             </ol>
@@ -223,8 +379,8 @@
 				<li>If so, is the date that it was sent out important?</li>
 				<li>When do you know the text and count for the permits for each parking lot?</li>
 				<li>Motorcycles, bicycles, and Adult Education</li>
-				<li>What are the changes to lot capacity for the upcoming year?</li>
-				<li>What are the dates for various payments ($75 at start, full amount during sign-up, etc)</li>
+				<li class="done">What are the changes to lot capacity for the upcoming year?</li>
+				<li class="done">What are the dates for various payments ($75 at start, full amount during sign-up, etc)</li>
 			</ol>
             <ul>
                 <li>Email citations to students, citation history</li>
@@ -234,22 +390,23 @@
                 <li>Deposit from start of housing to 8/14/14, on 8/14 turn on bill me later (make sure language is correct), on 4/1 turn off permits</li>
                 <li>Separate page for Adult Ed students (3 year expiration policy)</li>
             </ul>
-			
+            {% endcomment %}
         </div>
         <div class="summary">
             <h3>Lot Summary for 20{{search.acadYear|slice:"0:2"}}-20{{search.acadYear|slice:"2:"}}</h3>
             <table cellpadding="3" cellspacing="0" border="1">
-                <thead>
-                    <tr>
-                        <th>Lot</th>
-                        <th>Status</th>
-                        <th>Count</th>
-                    </tr>
-                </thead>
                 <tbody>
                     {% for summaryRow in summary %}
+                        {% ifchanged summaryRow.lotTxt %}
+                            <tr>
+                                <th colspan="2" style="text-align:center;">{{summaryRow.lotTxt}}</th>
+                            </tr>
+                            <tr>
+                                <th>Status</th>
+                                <th>Count</th>
+                            </tr>
+                        {% endifchanged %}
                         <tr>
-                            <td>{{summaryRow.lotTxt}}</td>
                             <td>{{summaryRow.status}}</td>
                             <td>{{summaryRow.spaces}}</td>
                         </tr>

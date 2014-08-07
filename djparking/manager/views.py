@@ -1,9 +1,10 @@
 import json #added to support ajax calls
 import re
-from . import Individual #custom object defined in __init__.py
-from datetime import date
+from . import Individual, Stickers, Sticker, Permit, Makes, Models, Vehicle #custom objects defined in __init__.py
+from datetime import date, datetime
 from django.conf import settings
 from django.core import serializers #added to support ajax calls
+from django.core.urlresolvers import reverse
 from django.http import HttpResponseRedirect, HttpResponse
 from django.shortcuts import render_to_response, get_object_or_404
 from django.template import RequestContext, loader, Context
@@ -19,7 +20,7 @@ else:
     TO_LIST = ["mkishline@carthage.edu",]
 BCC = settings.MANAGERS
 
-def search(request):
+def search(request, redir_acad_yr = None, redir_txt = '', redir_id = 0):
     thisYear = date.today().year - 1
     if date.today().month >= 4:
         thisYear = thisYear + 1
@@ -33,7 +34,6 @@ def search(request):
         acadYearList.append([val, txt])
 
     search = {'year':thisYear,'acadYear':acadYear,'ID':0,'text':''}
-    summary = getLotSummary(search['acadYear'])
     carYears = getCarYears()
     states = getStates()
     lots = []
@@ -45,25 +45,31 @@ def search(request):
         search['acadYear'] = request.POST.get('academicYear')
         search['text'] = request.POST.get('searchText')
         search['ID'] = request.POST.get('searchID')
+    elif redir_acad_yr != None:
+        search['acadYear'] = redir_acad_yr
+        search['text'] = redir_txt
+        search['ID'] = redir_id
 
-        individual = Individual(
-            search['ID'],
-            '20' + search['acadYear'][0:2],
-            search['acadYear']
-        )
+    isSearched = False
+    if search['ID'] > 0:
+        isSearched = True
+        individual = Individual(search['ID'], '20' + search['acadYear'][0:2], search['acadYear'])
         lots = getLots(individual.bldg != 'CMTR', individual.bldg == 'APT')
+
+    summary = getLotSummary(search['acadYear'])
 
     return render_to_response(
         "manager/search.html", {
             'years':acadYearList,'search':search,'currentAcadYear':acadYear,
-            'person':individual,'isSearched':request.method == 'POST',
+            'person':individual,'isSearched':isSearched,
             'lots':lots,'states':states,'summary':summary,'carYears':carYears,
-            'debug':'%s' % (debugvar)
+            'present':date.today(),'debug':'%s' % (debugvar)
         },
         context_instance=RequestContext(request)
     )
 
 def create(request):
+    #Create a vehicle record and associate it with a user
     vehicleInsert = addVehicle(
         request.POST.get('studentId'),
         request.POST.get('license'),
@@ -73,14 +79,28 @@ def create(request):
         request.POST.get('carYear'),
         request.POST.get('acadYear')
     )
+    #If a sticker was specified and the status was changed, create the permit record
+    if request.POST.get('sticker') != '' and request.POST.get('sticker') != None:
+        assignStickerToVehicle(
+            request.POST.get('sticker'),
+            vehicleInsert,
+            request.POST.get('active_date'),
+            request.POST.get('inactive_date'),
+            request.POST.get('permitComment')
+        )
+
+    """
     return render_to_response(
         "manager/success.html",
         {'debug':vehicleInsert },
         context_instance=RequestContext(request)
     )
+    """
+    return HttpResponseRedirect(reverse('manager_search_redirect', kwargs={'redir_id':request.POST.get('studentId'),'redir_acad_yr':request.POST.get('acadYear')}))
 
 def update(request):
     if request.POST.get('takeAction') == "update":
+        #Update the vehicle record
         vehicleUpdate = updateVehicle(
             request.POST.get('veh_no'),
             request.POST.get('license'),
@@ -89,18 +109,51 @@ def update(request):
             request.POST.get('carModel'),
             request.POST.get('carYear')
         )
+        veh = Vehicle().loadByID(int(vehicleUpdate))
+        #If a sticker was specified, create the permit record
+        if request.POST.get('sticker') != '' and request.POST.get('sticker') != None:
+            if request.POST.get('permitStatus') == '' or request.POST.get('permitStatus') == None:
+                vehicleUpdate = permitUpdate(
+                    request.POST.get('permit_no'),
+                    request.POST.get('active_date'),
+                    request.POST.get('inactive_date'),
+                    request.POST.get('permitComment')
+                )
+            else:
+                #If a sticker already exists for the vehicle
+                if veh.permitId != None:
+                    #Get the existing sticker attached to the record
+                    sticker = Sticker(veh.permit_code, veh.acad_yr)
+                    #Change the sticker's status
+                    sticker.updateStatus(request.POST.get('permitStatus'))
+                    #Inactivate the parking permit record (also clears a lotloctn space)
+                    old_permit = Permit(veh.permitId).inactivate()
+                
+                #Assign the sticker to the vehicle (creates the permit record)
+                assignStickerToVehicle(
+                    request.POST.get('sticker'),
+                    vehicleUpdate,
+                    request.POST.get('active_date'),
+                    request.POST.get('inactive_date'),
+                    request.POST.get('permitComment')
+                )
+
     elif request.POST.get('takeAction') == "delete":
-        vehicleUpdate = expireVehicle(request.POST.get('veh_no'))
+        #vehicleUpdate = expireVehicle(request.POST.get('veh_no'))
+        vehicleUpdate = "Delete"
     else:
         vehicleUpdate = ("Action '%s' did not match") % (request.POST.get('takeAction'))
+    
+    """
     return render_to_response(
         "manager/success.html",
         {'debug':vehicleUpdate},
         context_instance=RequestContext(request)
     )
+    """
+    return HttpResponseRedirect(reverse('manager_search_redirect', kwargs={'redir_id':request.POST.get('searchID'),'redir_acad_yr':request.POST.get('academicYear')}))
 
-#Get the collection of lots that are available to an
-#individual given their residency information
+#Get the collection of lots that are available to an individual given their residency information
 def getLots(isResident = None, isInApt = None, includeFull = False):
     lotSQL = (' SELECT    TRIM(spaces.lotcode)    lotcode, TRIM(lot.txt)    txt, COUNT(spaces.lotloctn) spots, lot.cost'
               ' FROM    lot_table    lot INNER JOIN    prkglot_rec    spaces    ON    lot.lotcode    =    spaces.lotcode'
@@ -132,40 +185,6 @@ def getLots(isResident = None, isInApt = None, includeFull = False):
 def getCarYears(minYear = 1900):
     return range(1947, date.today().year + 2)
 
-def getStickers(lotcode, acadYear):
-    permitSQL = (
-        ' SELECT TRIM(permit_txt) AS permit_txt'
-        ' FROM prkgstckr_rec'
-        ' WHERE LOWER(permit_assocdlot) = LOWER("%s")'
-        ' AND permt_stat = ""'
-        ' AND permit_acadyr = "%s"'
-        ' ORDER BY permit_txt'
-    ) % (lotcode, acadYear)
-    return do_sql(permitSQL).fetchall()
-
-#Get the list of car makers for a given year
-def getCarMakes(year, minYear = 1900):
-    carMakesSQL = (
-        ' SELECT DISTINCT INITCAP(TRIM(make_code)) AS make_code'
-        ' FROM vehmodel_table'
-        ' WHERE startyr > %s'
-        ' AND    %s  BETWEEN startyr AND NVL(endyr, %s)'
-        ' ORDER BY make_code'
-    ) % (minYear, year, year)
-    return do_sql(carMakesSQL).fetchall()
-
-#Get the list of models associated with a specified make within a limited year range
-def getCarModels(year, make, minYear = 1900):
-    carModelsSQL = (
-        ' SELECT INITCAP(TRIM(model_code)) AS model_code'
-        ' FROM vehmodel_table'
-        ' WHERE startyr > %s'
-        ' AND    %s  BETWEEN startyr AND NVL(endyr, %s)'
-        ' AND    TRIM(LOWER(make_code))   =   LOWER("%s")'
-        ' ORDER BY make_code, model_code'
-    ) % (minYear, year, year, make)
-    return do_sql(carModelsSQL).fetchall()
-
 #Get the list of states to be used in the drop down lists
 def getStates():
     stateSQL = (
@@ -183,19 +202,22 @@ def getLotSummary(acadYear):
         "    TRIM(lot_table.txt) lotTxt,"
         "    CASE TRIM(lot_rec.lot_stat)"
         "        WHEN    'A'    THEN    'Allocated/Sold'"
-        "        WHEN    ''    THEN    'Available'"
+        "        WHEN    ''     THEN    'Available'"
         "        WHEN    'S'    THEN    'Held in Reserve'"
-        "        WHEN    'R'    THEN    'Reserved (dumpsters/construction)'"
+        #"        WHEN    'R'    THEN    'Reserved (dumpsters/construction)'"
+        #"        WHEN    'R'    THEN    'Dumpster'"
         "        WHEN    'H'    THEN    'Handicap'"
         "        WHEN    'W'    THEN    'Waitlist'"
-        "        WHEN    'F'    THEN    'Fleet Vehicle'"
+        #"        WHEN    'F'    THEN    'Fleet Vehicle'"
         "    END AS status,"
         "    COUNT(*) AS spaces"
-        " FROM prkglot_rec lot_rec INNER JOIN lot_table ON lot_rec.lotcode = lot_table.lotcode"
+        " FROM  prkglot_rec lot_rec INNER JOIN  lot_table   ON  lot_rec.lotcode     =   lot_table.lotcode"
+        "                                                   AND lot_rec.lot_acadyr  =   lot_table.acadyr"
         " WHERE TODAY BETWEEN lot_rec.active_date AND NVL(lot_rec.inactive_date, TODAY)"
-        " AND acadyr = '%s'"
-        " GROUP BY lotTxt, lot_rec.lot_stat"
-        " ORDER BY lotTxt, status"
+        " AND   acadyr  =   '%s'"
+        " AND   lot_rec.lot_stat    NOT IN  ('R','F')"
+        " GROUP BY  lotTxt, lot_rec.lot_stat"
+        " ORDER BY  lotTxt, status"
     ) % (acadYear)
     return do_sql(summarySQL).fetchall()
 
@@ -205,30 +227,28 @@ def addVehicle(id, license, st_plate, make, model, model_yr, acadyr):
         " INSERT INTO veh_rec (id, license, st_plate, make, model, model_yr, acadyr, issued_date)"
         " VALUES (%s, '%s', '%s', '%s', '%s', %s, '%s', TODAY)"
     ) % (id, license, st_plate, make, model, model_yr, acadyr)
-    #do_sql(insertVehicleSQL)
-    getVehicleSQL = ("SELECT DISTINCT dbinfo('sqlca.sqlerrd1') AS veh_no FROM veh_rec")
-    #veh_results = do_sql(getVehicleSQL).fetchone()
-    #return veh_results.veh_no
-    return insertVehicleSQL
+    do_sql(insertVehicleSQL)
+    #getVehicleSQL = ("SELECT DISTINCT dbinfo('sqlca.sqlerrd1') AS veh_no FROM veh_rec")
+    getVehicleSQL = ("SELECT veh_no FROM veh_rec WHERE id = %s AND license = '%s' AND acadyr = '%s'") % (id, license, acadyr)
+    veh_results = do_sql(getVehicleSQL).fetchone()
+    return veh_results.veh_no
+    #return insertVehicleSQL
 
-def updateVehicle(veh_no, license, st_plate, make, model, model_yr, active_date, inactive_date):
+def updateVehicle(veh_no, license, st_plate, make, model, model_yr):
     updateVehicleSQL = (
         " UPDATE veh_rec"
         " SET license       =   '%s',"
         "   st_plate        =   '%s',"
         "   make            =   '%s',"
         "   model           =   '%s',"
-        "   model_yr        =   %s,"
-        "   active_date     =   '%s',"
-        "   inactive_date   =   '%s'"
+        "   model_yr        =   %s"
         " WHERE"
         "   veh_no      =   %s"
-    ) % (license, st_plate, make, model, model_yr, active_date, inactive_date, veh_no)
-    #do_sql(updateVehicleSQL)
-    #return veh_no
-    return updateVehicleSQL
+    ) % (license, st_plate, make, model, model_yr, veh_no)
+    do_sql(updateVehicleSQL)
+    return veh_no
 
-def reserveSpot(lot):
+def reserveSpot(acadYear, lot):
     getNextSQL = (
         " SELECT"
         "   lotcode, MIN(lot_no) AS lot_no, MIN(lotloctn) AS lotloctn"
@@ -239,9 +259,11 @@ def reserveSpot(lot):
         "   AND"
         "   TRIM(lot_stat)  =   ''"
         "   AND"
+        "   lot_acadyr  =   '%s'"
+        "   AND"
         "   lotcode =   '%s'"
         " GROUP BY lotcode"
-    ) % (lot)
+    ) % (acadYear, lot)
     getNext = do_sql(getNextSQL).fetchone()
     reserveSpotSQL = (
         " UPDATE prkglot_rec"
@@ -249,9 +271,9 @@ def reserveSpot(lot):
         " WHERE"
         "   lot_no      =   %s"
     ) % (getNext.lot_no)
-    #do_sql(reserveSpotSQL)
-    #return getNext.lot_no
-    return ("%s<br /><br />%s") % (getNextSQL, reserveSpotSQL)
+    do_sql(reserveSpotSQL)
+    return getNext.lot_no
+    #return ("%s<br /><br />%s") % (getNextSQL, reserveSpotSQL)
 
 def assignPermit(id, veh_no, nextSpot, acadYear):
     insertPermitSQL = (
@@ -259,7 +281,112 @@ def assignPermit(id, veh_no, nextSpot, acadYear):
         "   (lotcode, lotloctn, permit_code, acadyr, permt_id, veh_no, permt_stat, active_date, permtcmmnt)"
         " VALUES ('%s', '%s', '%s', '%s', %s, %s, '%s', '%s', '%s')"
     ) % (nextSpot.lotcode, nextSpot.lotloctn, '', acadYear, id, veh_no, '', TODAY, '')
-    #do_sql(insertPermitSQL)
+    do_sql(insertPermitSQL)
+
+def permitUpdate(permit_no, active_date, inactive_date, comment):
+    updatePermitSQL = (
+        " UPDATE prkgpermt_rec"
+        " SET active_date = '%s',"
+        "     inactive_date = '%s',"
+        "     permtcmmnt = '%s'"
+        " WHERE permt_no = %s"
+    ) % (active_date, inactive_date, comment, permit_no)
+    do_sql(updatePermitSQL)
+    return updatePermitSQL
+
+def assignStickerToVehicle(sticker_txt, veh_no, active_date, inactive_date = None, permit_comment = ''):
+    #Get vehicle record
+    vehicle = Vehicle().loadByID(veh_no)
+
+    #Get sticker record
+    selectStickerSQL = (
+        " SELECT sticker.*"
+        " FROM prkgstckr_rec sticker"
+        " WHERE sticker.permit_txt = '%s'"
+        " AND sticker.permt_stat = ''"
+    ) % (sticker_txt)
+    sticker_results = do_sql(selectStickerSQL)
+
+    if sticker_results != None:
+        sticker = sticker_results.fetchone()
+        
+        #Update prkgstckr_rec (flag sticker as sold)
+        updateStickerSQL = (
+            " UPDATE prkgstckr_rec"
+            " SET permt_stat = 'A'"
+            " , issue_date = '%s'"
+            " WHERE"
+            " permit_stckrcd = '%s'"
+            ) % (active_date, sticker.permit_stckrcd)
+        do_sql(updateStickerSQL)
+
+        #Get the next available spot in the lot
+        consumeLotLocationSQL = (
+            " UPDATE prkglot_rec"
+            " SET lot_stat = 'A'"
+            " , lotcmmnt = '%s,%s'"
+            " WHERE"
+            "   lotcode = '%s'"
+            "   AND"
+            "   lotloctn = ("
+            "       SELECT MIN(lotloctn)"
+            "       FROM    prkglot_rec"
+            "       WHERE   lotcode = '%s'"
+            "       AND     lot_stat = ''"
+            "   )"
+        )   %   (vehicle.id, veh_no, sticker.permit_assocdlot, sticker.permit_assocdlot)
+        do_sql(consumeLotLocationSQL)
+
+        #Get lot location detail
+        getLotLocationSQL = (
+            " SELECT prkglot_rec.*"
+            " FROM prkglot_rec"
+            " WHERE lotcmmnt = '%s,%s'"
+        ) % (vehicle.id, veh_no)
+        lot_loc = do_sql(getLotLocationSQL).fetchone()
+
+        #Create prkgpermt_rec record
+        insertPermitSQL = (
+            " INSERT INTO prkgpermt_rec (lotcode, lotloctn, permit_code, acadyr, permt_id, veh_no, permt_stat, active_date, inactive_date, permtcmmnt)"
+            " VALUES ('%s', '%s', '%s', '%s', %s, %s, '%s', '%s', '%s', '%s')"
+        ) % (sticker.permit_assocdlot, lot_loc.lotloctn, sticker.permit_stckrcd, vehicle.acad_yr, vehicle.id, veh_no, 'A', active_date, inactive_date, permit_comment)
+        do_sql(insertPermitSQL)
+
+    else:
+        return -1
+
+    return None
+
+def removeStickerFromVehicle(permit_status, veh_no):
+    #Update prkgpermt_rec (set inactive date)
+    #Update prkgstckr_rec (flag sticker as S=Surrender, L=Lost, D=Damaged/Destroyed)
+    
+    #Get vehicle information (to be used in sticker query)
+    vehicle = Vehicle().loadByID(veh_no)
+
+    #Update sticker status
+    """
+    updateStickerSQL = (
+        " UPDATE prkgstckr_rec"
+        " SET permt_stat = '%s'"
+        " , inactive_date = TODAY"
+        " WHERE permit_stckrcd = '%s'"
+        " AND permit_acadyr = '%s'"
+    ) % (permit_status, vehicle.permit_code, vehicle.acad_yr)
+    do_sql(updateStickerSQL)
+    """
+    Sticker(vehicle.permit_code, vehicle.acad_yr).updateStatus(permit_status)
+
+    """
+    updatePermitSQL = (
+        " UPDATE prkgpermt_rec"
+        " SET inactive_date = TODAY"
+        " WHERE veh_no = %s"
+    ) % (veh_no)
+    """
+    Permit(vehicle.permitId).inactivate()
+
+    return None
 
 def expireVehicle(veh_no):
     vehicleExpireSQL = (
@@ -267,25 +394,32 @@ def expireVehicle(veh_no):
         " SET inactive_date = TODAY"
         " WHERE veh_no = %s"
     ) % (veh_no)
-    #do_sql(vehicleExpireSQL)
+    do_sql(vehicleExpireSQL)
     return veh_no
+
+#def ajaxLots(request, isMotorcycle, isResident, isInApt, includeFull):
+#    if isMotorcycle:
 
 def ajaxCarMakes(request, year):
     #Retrieve the list of car makes for a specific year
-    makes = getCarMakes(year)
+    #makes = getCarMakes(year)
+    makes = Makes().getByYear(year)
+    
     #Create string of makes delimited by a ","
     tmp = ','.join([make.make_code for make in makes])
     return HttpResponse(simplejson.dumps(tmp), content_type="application/json")
 
 def ajaxCarModels(request, year, make):
     #Retrieve the list of models given the year and make of the car
-    models = getCarModels(year, make)
+    #models = getCarModels(year, make)
+    models = Models().getByYearMake(year, make)
+    
     #Create string of models delimited by a ","
     tmp = ','.join([model.model_code for model in models])
     return HttpResponse(simplejson.dumps(tmp), content_type="application/json")
 
 def ajaxStickers(request, lotcode, acadYear):
-    stickers = getStickers(lotcode, acadYear)
+    stickers = Stickers().forLot(lotcode, acadYear)
     tmp = ','.join([sticker.permit_txt for sticker in stickers])
     return HttpResponse(simplejson.dumps(tmp), content_type="application/json")
 
