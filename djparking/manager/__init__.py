@@ -4,13 +4,14 @@ class Individual:
     def __init__(self, id, year, acadYear):
         #Query the information about the person
         personSQL = (
-            ' SELECT DISTINCT'
+            ' SELECT'
             '   IDrec.id, TRIM(IDrec.firstname) AS firstname, TRIM(IDrec.lastname) AS lastname, TRIM(SRVrec.bldg) AS bldg'
             ' FROM'
-            '   id_rec	IDrec	INNER JOIN	stu_serv_rec	SRVrec	ON	IDrec.id		    =	SRVrec.id'
-            '                                                       AND	SRVrec.yr		    =	%s'
+            '   id_rec    IDrec    INNER JOIN    stu_serv_rec    SRVrec    ON    IDrec.id            =    SRVrec.id'
+            '                                                       AND    SRVrec.yr            =    %s'
             ' WHERE'
             '   IDrec.id  =   %s'
+            ' GROUP BY id, firstname, lastname, bldg'
         ) % (year, id)
         person = do_sql(personSQL).fetchone()
 
@@ -33,15 +34,15 @@ class Individual:
             '   PRKrec.lotcode, PRKrec.permit_code, TRIM(PRKrec.permtcmmnt) AS permitcomment, TO_CHAR(PRKrec.active_date, "%%m/%%d/%%Y") AS active_date,'
             '   TO_CHAR(PRKrec.inactive_date, "%%m/%%d/%%Y") AS inactive_date, TRIM(STKrec.permit_txt) AS permit_txt, VEHrec.acadyr AS acad_yr'
             ' FROM'
-            '	veh_rec	VEHrec	LEFT JOIN	prkgpermt_rec	PRKrec	ON	VEHrec.veh_no		=	PRKrec.veh_no'
-            '			        LEFT JOIN	prkgstckr_rec	STKrec	ON	PRKrec.permit_code	=	STKrec.permit_stckrcd'
-            '							    						AND	VEHrec.acadyr		=	STKrec.permit_acadyr'
+            '    veh_rec    VEHrec    LEFT JOIN    prkgpermt_rec    PRKrec    ON    VEHrec.veh_no        =    PRKrec.veh_no'
+            '                    LEFT JOIN    prkgstckr_rec    STKrec    ON    PRKrec.permit_code    =    STKrec.permit_stckrcd'
+            '                                                        AND    VEHrec.acadyr        =    STKrec.permit_acadyr'
             ' WHERE'
             '   TODAY       BETWEEN VEHrec.issued_date AND NVL(VEHrec.inactive_date, TODAY)'
             '   AND'
             '   VEHrec.id       =   %s'
             '   AND'
-            '   VEHrec.acadyr	=	"%s"'
+            '   VEHrec.acadyr    =    "%s"'
             ' ORDER BY PRKrec.permt_no'
         ) % (id, acadYear)
 
@@ -98,9 +99,9 @@ class Vehicle:
             '   TO_CHAR(PRKrec.active_date, "%%m/%%d/%%Y") AS active_date, TO_CHAR(PRKrec.inactive_date, "%%m/%%d/%%Y") AS inactive_date,'
             '   TRIM(STKrec.permit_txt) AS permit_txt, VEHrec.acadyr AS acad_yr'
             ' FROM'
-            '	veh_rec	VEHrec	LEFT JOIN	prkgpermt_rec	PRKrec	ON	VEHrec.veh_no		=	PRKrec.veh_no'
-            '			        LEFT JOIN	prkgstckr_rec	STKrec	ON	PRKrec.permit_code	=	STKrec.permit_stckrcd'
-            '							    						AND	VEHrec.acadyr		=	STKrec.permit_acadyr'
+            '    veh_rec    VEHrec    LEFT JOIN    prkgpermt_rec    PRKrec    ON    VEHrec.veh_no        =    PRKrec.veh_no'
+            '                    LEFT JOIN    prkgstckr_rec    STKrec    ON    PRKrec.permit_code    =    STKrec.permit_stckrcd'
+            '                                                        AND    VEHrec.acadyr        =    STKrec.permit_acadyr'
             ' WHERE'
             '   VEHrec.veh_no   =   %s'
         ) % (veh_no)
@@ -265,7 +266,7 @@ class Makes:
 
     def getByYear(self, valid_year, min_year = 1900):
         matchedMakesSQL = (
-            ' SELECT DISTINCT'
+            ' SELECT'
             '   INITCAP(TRIM(make_code)) AS make_code'
             ' FROM'
             '   vehmodel_table'
@@ -273,6 +274,7 @@ class Makes:
             '   startyr >       %s'
             '   AND'
             '   %s      BETWEEN startyr AND NVL(endyr, %s)'
+            ' GROUP BY make_code'
             ' ORDER BY make_code'
         ) % (min_year, valid_year, valid_year)
         return do_sql(matchedMakesSQL).fetchall()
@@ -285,7 +287,7 @@ class Models:
     
     def getByYearMake(self, model_year, make):
         matchedModelsSQL = (
-            ' SELECT DISTINCT'
+            ' SELECT'
             '   INITCAP(TRIM(model_code)) AS model_code'
             ' FROM'
             '   vehmodel_table'
@@ -295,6 +297,7 @@ class Models:
             '   %s      BETWEEN startyr AND NVL(endyr, %s)'
             '   AND'
             '   TRIM(LOWER(make_code))  =   "%s"'
+            ' GROUP BY model_code'
             ' ORDER BY model_code'
         ) % (1900, model_year, model_year, make.lower())
         return do_sql(matchedModelsSQL).fetchall()  

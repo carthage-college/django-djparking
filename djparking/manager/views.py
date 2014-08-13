@@ -89,6 +89,13 @@ def create(request):
             request.POST.get('permitComment')
         )
 
+    if request.POST.get('carMake').lower() == 'zzgenericmake':
+        email_data = {'actionType':'created','comment':request.POST.get('permitComment')}
+        send_mail(
+            None, ['mkishline@carthage.edu'], 'Generic vehicle in Parking Admin', 'confirmation@carthage.edu',
+            'manager/email_genericvehicle.html', email_data
+        )
+
     """
     return render_to_response(
         "manager/success.html",
@@ -154,32 +161,44 @@ def update(request):
     return HttpResponseRedirect(reverse('manager_search_redirect', kwargs={'redir_id':request.POST.get('searchID'),'redir_acad_yr':request.POST.get('academicYear')}))
 
 #Get the collection of lots that are available to an individual given their residency information
-def getLots(isResident = None, isInApt = None, includeFull = False):
-    lotSQL = (' SELECT    TRIM(spaces.lotcode)    lotcode, TRIM(lot.txt)    txt, COUNT(spaces.lotloctn) spots, lot.cost'
-              ' FROM    lot_table    lot INNER JOIN    prkglot_rec    spaces    ON    lot.lotcode    =    spaces.lotcode'
-              ' WHERE    TODAY            BETWEEN    lot.active_date    AND    NVL(lot.inactive_date, TODAY)'
-              ' AND        spaces.lot_stat    =        ""'
-              ' AND'
-              ' ('
-             )
+def getLots(isResident = None, isInApt = None, isMotorcycle = None, includeFull = False):
+    if isMotorcycle == True or isMotorcycle == 'true':
+        lotSQL = (
+            ' SELECT TRIM(lot.lotcode) AS lotcode, TRIM(lot.txt) AS txt, 0 AS spots'
+            ' FROM  lot_table lot'
+            ' WHERE TODAY       BETWEEN lot.active_date AND NVL(lot.inactive_date, TODAY)'
+            ' AND   lot.lotcode     =   "MCYC"'
+        )
+    else:
+        lotSQL = (' SELECT  TRIM(spaces.lotcode) AS lotcode, TRIM(lot.txt) AS txt, COUNT(spaces.lotloctn) AS spots'
+                  ' FROM    lot_table   lot INNER JOIN  prkglot_rec spaces  ON  lot.lotcode =   spaces.lotcode'
+                  ' WHERE   TODAY            BETWEEN    lot.active_date     AND NVL(lot.inactive_date, TODAY)'
+                  ' AND     spaces.lot_stat    =        ""'
+                  ' AND'
+                  ' ('
+                 )
+    
+        #Check if arguments were passed into the function
+        if isResident != None:
+            #If the individual is a campus resident they have access to
+            #all lots besides Commuter, Lot S, and the virtual Motorcycle lot
+            if isResident == 'true' or isResident == True:
+                lotSQL += ' lot.lotcode NOT IN ("CMTR","LOTS","MCYC")'
+                #Individuals who live in the apartments are allowed to buy a permit for Lot S
+                if isInApt == True or isInApt == 'true':
+                    lotSQL += ' OR lot.lotcode = "LOTS"'
+            else:
+                lotSQL += ' lot.lotcode = "CMTR"'
 
-    #Check if arguments were passed into the function
-    if isResident != None:
-        #If the individual is a campus resident they have access to
-        #all lots besides Commuter and Lot S
-        if isResident:
-            lotSQL += ' lot.lotcode NOT IN ("CMTR","LOTS")'
-            #Individuals who live in the apartments are allowed
-            #to buy a permit for Lot S
-            if isInApt:
-                lotSQL += ' OR lot.lotcode = "LOTS"'
-        else:
-            lotSQL += ' lot.lotcode = "CMTR"'
-    lotSQL += ') GROUP BY spaces.lotcode, lot.txt, lot.cost'
-    if not includeFull:
-        lotSQL += ' HAVING COUNT(spaces.lotloctn) > 0'
-    lotSQL += ' ORDER BY TRIM(lot.txt)'
-    lot_results = do_sql(lotSQL).fetchall()
+        lotSQL += ') GROUP BY spaces.lotcode, lot.txt'
+        if not includeFull or includeFull == 'false':
+            lotSQL += ' HAVING COUNT(spaces.lotloctn) > 0'
+        lotSQL += ' ORDER BY TRIM(lot.txt)'
+
+    try:
+        lot_results = do_sql(lotSQL).fetchall()
+    except:
+        lot_results = lotSQL
     return lot_results
 
 def getCarYears(minYear = 1900):
@@ -397,33 +416,56 @@ def expireVehicle(veh_no):
     do_sql(vehicleExpireSQL)
     return veh_no
 
-#def ajaxLots(request, isMotorcycle, isResident, isInApt, includeFull):
-#    if isMotorcycle:
-
-def ajaxCarMakes(request, year):
-    #Retrieve the list of car makes for a specific year
-    #makes = getCarMakes(year)
-    makes = Makes().getByYear(year)
+def ajaxLots(request):
+    isResident = request.GET.get('isResident')
+    isInApt = request.GET.get('isInApt')
+    isMotorcycle = request.GET.get('isMotorcycle')
     
-    #Create string of makes delimited by a ","
-    tmp = ','.join([make.make_code for make in makes])
-    return HttpResponse(simplejson.dumps(tmp), content_type="application/json")
+    lot_results = getLots(isResident, isInApt, isMotorcycle)
+    jsonDump = []
+    try:
+        for lot in lot_results:
+            tmpdict = {'lotcode':lot.lotcode,'txt':lot.txt}
+            jsonDump.append(tmpdict)
+    except Exception as e:
+        jsonDump.append({'lotcode':'none','txt':lot_results})
 
-def ajaxCarModels(request, year, make):
+    return HttpResponse(simplejson.dumps(jsonDump), content_type="application/json")
+
+def ajaxCarMakes(request):
+    #Retrieve the list of car makes for a specific year
+    makes = Makes().getByYear(request.GET.get('year'))
+    
+    #Create string of makes delimited by a ','
+    tmp = ','.join([make.make_code for make in makes])
+    return HttpResponse(simplejson.dumps(tmp), content_type="applicaton/json")
+
+def ajaxCarModels(request):
+    year = request.GET.get('year')
+    make = request.GET.get('make')
+
     #Retrieve the list of models given the year and make of the car
-    #models = getCarModels(year, make)
     models = Models().getByYearMake(year, make)
     
     #Create string of models delimited by a ","
-    tmp = ','.join([model.model_code for model in models])
+    tmp = ''
+    if len(models):
+        tmp = ','.join([model.model_code for model in models])
     return HttpResponse(simplejson.dumps(tmp), content_type="application/json")
 
-def ajaxStickers(request, lotcode, acadYear):
-    stickers = Stickers().forLot(lotcode, acadYear)
+def ajaxStickers(request):
+    lotcode = request.GET.get('lotcode')
+    acadYear = request.GET.get('acadYear')
+    originalSticker = request.GET.get('originalSticker')
+    stickers = Stickers().forLot(lotcode, acadYear, originalSticker)
     tmp = ','.join([sticker.permit_txt for sticker in stickers])
     return HttpResponse(simplejson.dumps(tmp), content_type="application/json")
 
-def ajaxSearch(request, acadYear):
+#def ajaxSearch(request, acadYear):
+def ajaxSearch(request):
+    
+    acadYear = request.GET.get('acadYear')
+    
     #The jQueryUI autocomplete widget passes its value as a GET variable called "term"
     searchTerm = request.GET.get('term')
     #Academic year is passed as part of the URL. Since academic years are a concatenation of the last two digits of the years (ie 1314 = 2013-2014)
@@ -431,7 +473,7 @@ def ajaxSearch(request, acadYear):
     thisYear = '20' + acadYear[0:2]
 
     searchSQL = (
-        ' SELECT DISTINCT'
+        ' SELECT'
         '    TRIM(IDrec.lastname) || ", " || TRIM(IDrec.firstname) || " (" || IDrec.id || ")" AS value, IDrec.id, IDrec.firstname, IDrec.lastname'
         ' FROM'
         '   id_rec  IDrec   INNER JOIN  stu_serv_rec    SRVrec  ON  IDrec.id            =   SRVrec.id'
@@ -455,15 +497,22 @@ def ajaxSearch(request, acadYear):
     else:
         searchSQL += ' WHERE LOWER(IDrec.lastname)   LIKE    LOWER("%s%%")' % (searchTerm)
 
-    #Add sorting so multiple results are more easily viewed by user
-    searchSQL += ' ORDER BY IDrec.lastname, IDrec.firstname'
-
-    search_results = do_sql(searchSQL).fetchall()
+    #Add grouping to filter out duplicates and sorting so multiple results are more easily viewed by user
+    searchSQL += (
+        ' GROUP BY value, id, IDrec.lastname, IDrec.firstname'
+        ' ORDER BY IDrec.lastname, IDrec.firstname'
+    )
 
     #Create a serializable entity with the results from the query
     jsonDump = []
-    for result in search_results:
-        tmpdict = {'id':result.id,'value':result.value}
-        jsonDump.append(tmpdict)
+
+    try:
+        search_results = do_sql(searchSQL).fetchall()
+    
+        for result in search_results:
+            tmpdict = {'id':result.id,'value':result.value}
+            jsonDump.append(tmpdict)
+    except:
+        jsonDump = searchSQL
 
     return HttpResponse(simplejson.dumps(jsonDump), content_type="application/json")

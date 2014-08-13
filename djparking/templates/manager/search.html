@@ -62,7 +62,16 @@
 
                 //Initialize autocomplete search box
                 $('#search').autocomplete({
-                    source:'../ajax/search/' + $('select[name="academicYear"]').val() + '/',
+                    source: function(request, response){
+                        $.getJSON('{% url "ajax_search" %}',
+                            {
+                                term:request.term,
+                                acadYear:$('select[name="academicYear"]').val()
+                            }
+                        ).done(function(data){
+                            response(data);
+                        })
+                    },
                     minLength:2,
                     select:function(event, ui){
                         $('#search').val(ui.item.value);
@@ -146,19 +155,25 @@
                         //Trigger the update event for the Chosen plugin select boxes
                         $(selPermit).trigger('liszt:updated');
 
-                        $.getJSON('../ajax/permits/' + $('select[name="academicYear"]').val() + '/' + $(selLot).val() + '/', function(){
-                            console.log('Beginning permit JSON request.');
-                        }).done(function(permitList){
+                        var permitValues = '';
+                        $.getJSON('../ajax/permits/',
+                            {
+                                acadYear:$('select[name="academicYear"]').val(),
+                                lotcode:$(selLot).val(),
+                                originalSticker:$('input[name="initialSticker"][data-veh="' + thisVeh + '"]').val()
+                            }
+                        ).done(function(permitList){
+                            permitValues = permitList;
+                        }).fail(function(jqxhr, textStatus, error){
+                            alert('Unable to retrieve the list of Stickers. Please try again.');
+                            console.log('Request failed: ' + textStatus + ', ' + error);
+                        }).always(function(){
                             //Remove the loading placeholder
                             clearSelect(selPermit);
-                            //Update the list of permits with the results of the ajax call
-                            loadSelect(selPermit, permitList, true);
+                            //Update the list of stickers with the results of the ajax call (or empty if it failed)
+                            loadSelect(selPermit, permitValues, true);
                             //Trigger the update event for the Chosen plugin
                             $(selPermit).trigger('liszt:updated');
-                        }).fail(function(jqxhr, textStatus, error){
-                            //If something goes wrong, let the user know and log the error to the console for debugging
-                            alert('Unable to retrieve the list of Permits. Please try again.');
-                            console.log('Request failed: ' + textStatus + ', ' + error);
                         });
                     });
                 });
@@ -168,18 +183,28 @@
                     //Get the veh_no
                     var veh_attr = '[data-veh="' + $(this).data('veh') + '"]';
                     //If the selected sticker has been changed from when the page loaded, show the "permit status" dropdown. Otherwise, hide the dropdown.
-                    /*
-                    $('select[name="permitStatus"]' + veh_attr).parent('div').toggle(
-                        $('select[name="sticker"]' + veh_attr).val() != $('input[name="initialSticker"]' + veh_attr).val()
-                    );
-                    */
                     $('select[name="permitStatus"]' + veh_attr).parents('form').find('.permitChangeBlock').toggle(
                         $('select[name="sticker"]' + veh_attr).val () != $('input[name="initialSticker"]' + veh_attr).val()
                     );
                 });
 
+                //Attach click event to the refresh icon
+                $('.permitRefresh').click(function(e){
+                    e.preventDefault();
+                    $parentForm = $(this).parents('form.vehicleForm');
+                    $parentForm.find('select[name="lot"]').change();
+                    /*
+                    var originalSticker = $parentForm.find('input[name="initialSticker"]').val();
+                    console.log('Sticker:' + originalSticker + '.');
+                    var $stickerSelect = $parentForm.find('select[name="sticker"]');
+                    console.log($stickerSelect.find('option[value="' + originalSticker + '"]'));
+                    $stickerSelect.find('option[value="' + originalSticker + '"]').attr('selected','selected');
+                    console.log('New select sticker val: ' + $stickerSelect.val() + ' should match ' + originalSticker);
+                    $stickerSelect.trigger('liszt:updated');
+                    */
+                });
+
                 //Hide all the "permit status" dropdowns when the page loads.
-                //$('select[name="permitStatus"]').parent('div').hide();
                 $('.permitChangeBlock').hide();
 
                 $('input[name="license"]').blur(function(){
@@ -206,19 +231,24 @@
                             //Trigger the update event for the Chosen plugin select boxes
                             $(selMake + ',' + selModel).trigger('liszt:updated');
 
-                            $.getJSON('../ajax/makes/' + $(this).val() + '/', function(){
-                                console.log('Beginning make JSON request.')
-                            }).done(function(makeList){
-                                //Remove the loading placeholder
-                                clearSelect(selMake);
-                                //Update the list of makes with the results of the ajax call
-                                loadSelect(selMake, makeList, true);
-                                //Trigger the update event for the Chosen plugin
-                                $(selMake).trigger('liszt:updated');
+                            var makeValues = '';
+                            $.getJSON('{% url "ajax_carMakes" %}',
+                                {
+                                    year:$(this).val()
+                                }
+                            ).done(function(makeList){
+                                makeValues = makeList;
                             }).fail(function(jqxhr, textStatus, error){
                                 //If something goes wrong, let the user know and log the error to the console for debugging
                                 alert('Unable to retrieve the list of Makes. Please try again.');
                                 console.log('Request failed: ' + textStatus + ', ' + error);
+                            }).always(function(){
+                                //Remove the loading placeholder
+                                clearSelect(selMake);
+                                //Update the list of makes with the results of the ajax call
+                                loadSelect(selMake, makeValues, true);
+                                //Trigger the update event for the Chosen plugin
+                                $(selMake).trigger('liszt:updated');
                             });
                         }
                     });
@@ -226,39 +256,79 @@
 
                 //Loop through each Make select box
                 $('select[name="carMake"]').each(function(){
+                    //Store the veh_no and make of the vehicle
                     var thisVeh = $(this).data('veh');
+                        
                     //Build the jQuery selector strings
                     var selYear = 'select[name="carYear"][data-veh="' + thisVeh + '"]',
-                        selModel = 'select[name="carModel"][data-veh="' + thisVeh + '"]';
+                        selModel = 'select[name="carModel"][data-veh="' + thisVeh + '"]',
+                        selLot = 'select[name="lot"][data-veh="' + thisVeh + '"]';
 
                     //Initialize the "onchange" event for each Make select box
                     $('select[name="carMake"][data-veh="' + thisVeh + '"]').change(function(){
+                        var thisMake = $(this).val(),
+                            isMotorcycle = thisMake == 'Motorcycle';
+                        
                         //Clear the values from the model dropdown
                         clearSelect(selModel);
                         //Put a loading placeholder in the model select box
                         loadSelect(selModel, LOADING_MESSAGE, false);
                         //Trigger the update event for the Chosen plugin
                         $(selModel).trigger('liszt:updated');
-                        
-                        $.getJSON('../ajax/models/' + $(selYear).val() + '/' + $(this).val() + '/', function(){
-                            console.log('Beginning model JSON request.');
-                        }).done(function(modelList){
+
+                        $.getJSON('{% url "ajax_carModels" %}',
+                            {
+                                year:$(selYear).val(),
+                                make:thisMake
+                            }
+                        ).done(function(modelList){
                             //Remove the loading placeholder
                             clearSelect(selModel);
                             //Update the list of models with the results of the ajax call
                             loadSelect(selModel, modelList, true);
-                            //Trigger the update for the Chosen plugin
-                            $(selModel).trigger('liszt:updated');
+
+                            //Get the code of the original lot (assuming this is an update, not an insert)
+                            originalLot = $('.originalLot[data-veh="' + thisVeh + '"]').text();
+                            defaultLot = isMotorcycle ? 'MCYC' : originalLot;
+
+                            //Standard procedure: clear select, add loading message, update select
+                            clearSelect(selLot);
+                            loadSelect(selLot, LOADING_MESSAGE, false);
+                            $(selLot).trigger('liszt:updated');
+
+                            //Find the lots that match the current criteria (residential status, apartment residency, vehicle is motorcycle)
+                            $.getJSON('{% url "ajax_lots" %}',
+                                {
+                                    isResident:$('#bldg').text() != 'CMTR',
+                                    isInApt:$('#bldg').text() == 'APTS',
+                                    isMotorcycle:isMotorcycle
+                                }
+                            ).done(function(jsonResponse){
+                                clearSelect(selLot);
+                                $.each(jsonResponse, function(index, item){
+                                    $(selLot).append('<option value="' + item.lotcode + '">' + item.txt + '</option>');
+                                });
+                                $(selLot).val(defaultLot);
+                                if(defaultLot != originalLot){
+                                    $(selLot).change();
+                                }
+                            }).fail(function(jqxhr, textStatus, error){
+                                clearSelect(selLot);
+                            }).always(function(){
+                                $(selLot).trigger('liszt:updated');
+                            });
                         }).fail(function(jqxhr, textStatus, error){
                             //If something goes wrong, let the user know and log the error to the console for debugging.
                             alert('Unable to retrieve the list of Models. Please try again.');
                             console.log('Request failed: ' + textStatus + ', ' + error);
+                            
+                            //If the request failed, clear the loading message
+                            clearSelect(selModel);
+                        }).always(function(){
+                            //Trigger the update for the Chosen plugin
+                            $(selModel).trigger('liszt:updated');
                         });
                     });
-                    
-                    if($(this).val() == 'Motorcycle'){
-                        
-                    }
                 });
             });
         </script>
@@ -268,6 +338,7 @@
             .personDetail {padding-left:10px;margin-top:15px;}
                 .personDetail h3 {padding-top:10px;clear:both;}
                 .personDetail .infoField {float:left;width:140px;}
+                .personDetail .wideField {float:left;width:210px;}
             .row {clear:both;}
             .summary {width:19%;float:right;}
             .summary h3 {text-align:center;}
@@ -288,19 +359,17 @@
             form.newForm {background-color:#C5B32F;}
             div.infoField.has-error {padding:5px;background-color:#CC0000;margin-left:8px;}
 
-            input[type="image"] {width:25px;padding-left:10px;}
-            select[name="lot"], select[name="st_plate"] {width:70px;}
-            select[name="sticker"] {width:120px;}
+            input[type="image"] {width:25px;}
+            select[name="lot"] {width:100px;}
+            select[name="st_plate"] {width:70px;}
+            select[name="sticker"] {width:110px;}
             select[name="permitStatus"] {width:100px;}
             select[name="carYear"] {width:80px;}
             select[name="carMake"] {width:125px;}
             select[name="carModel"] {width:115px;}
-            input[name="license"], input[name="active_date"], input[name="inactive_date"] {font-size:13px;}
+            input[name="license"], input[name="active_date"], input[name="inactive_date"], input[name="original_inactive_date"] {font-size:13px;}
 
             /* Buttonset CSS */
-            /*
-            .ui-button-text-only .ui-button-text { font-size:.7em; }
-            */
             .ui-button-text-only .ui-button-text {padding:.4em;}
             .ui-widget {font-size:.8em;}
         </style>
@@ -336,7 +405,7 @@
                             ID: {{person.id}}
                         </div>
                         <div class="infoField">
-                            Residence: {{person.bldg}}
+                            Residence: <span id="bldg">{{person.bldg}}</span>
                         </div>
                         {% include "manager/vehicles.html" %}
                     </fieldset>

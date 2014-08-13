@@ -72,6 +72,7 @@
                         <option value="{{sticker.permit_txt}}"{% ifequal vehicle.permit_txt sticker.permit_txt %} selected="selected"{% endifequal %}>{{sticker.permit_txt}}</option>
                     {% endfor %}
                 </select>
+                {% comment %}<input type="image" src="http://png-3.findicons.com/files/icons/808/on_stage/128/refresh.png" class="permitRefresh" alt="Refresh Permits" title="Refresh Permits" />{% endcomment %}
                 <input type="hidden" name="initialSticker" data-veh="{{vehicle.veh_no}}" value="{{vehicle.permit_txt}}" />
             </div>
         </div>
@@ -83,10 +84,13 @@
         </div>
         
         {% ifnotequal vehicle.veh_no 0 %}
+            <div class="wideField">
+                This permit is: Assigned
+            </div>
             <div class="permitChangeBlock">
                 <h3>Original Permit</h3>
                 <div class="infoField">
-                    {{vehicle.lotcode}}
+                    <span class="originalLot" data-veh="{{vehicle.veh_no}}">{{vehicle.lotcode}}</span>
                 </div>
                 <div class="infoField">
                     {{vehicle.permit_txt}}
@@ -97,11 +101,12 @@
                 <div class="infoField">
                     <input type="text" name="original_inactive_date" class="datepicker" data-veh="{{vehicle.veh_no}}" data-student="{{person.id}}" value="{% if vehicle.inactive_date %}{{vehicle.inactive_date}}{% endif %}" size="8" placeholder="Inactive Date" />
                 </div>
-                <div class="infoField">
+                <div class="wideField">
+                    This permit is:
                     <select name="permitStatus" data-veh="{{vehicle.veh_no}}" data-student="{{person.id}}" class="chosenDDL">
                         <option value="">Available</option>
                         <option value="A">Assigned</option>
-                        <option value="S">Surrender</option>
+                        <option value="S">Surrendered</option>
                         <option value="L">Lost</option>
                         <option value="D">Damaged</option>
                     </select>
