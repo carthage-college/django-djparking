@@ -99,7 +99,7 @@
                     {{vehicle.active_date}}
                 </div>
                 <div class="infoField">
-                    <input type="text" name="original_inactive_date" class="datepicker" data-veh="{{vehicle.veh_no}}" data-student="{{person.id}}" value="{% if vehicle.inactive_date %}{{vehicle.inactive_date}}{% endif %}" size="8" placeholder="Inactive Date" />
+                    <input type="text" name="original_inactive_date" class="datepicker" data-veh="{{vehicle.veh_no}}" data-student="{{person.id}}" value="{% if vehicle.inactive_date %}{{vehicle.inactive_date}}{% else %}{{present|date:"m/d/Y"}}{% endif %}" size="8" placeholder="Inactive Date" />
                 </div>
                 <div class="wideField">
                     This permit is:

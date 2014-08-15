@@ -34,13 +34,19 @@ class Individual:
             '   PRKrec.lotcode, PRKrec.permit_code, TRIM(PRKrec.permtcmmnt) AS permitcomment, TO_CHAR(PRKrec.active_date, "%%m/%%d/%%Y") AS active_date,'
             '   TO_CHAR(PRKrec.inactive_date, "%%m/%%d/%%Y") AS inactive_date, TRIM(STKrec.permit_txt) AS permit_txt, VEHrec.acadyr AS acad_yr'
             ' FROM'
-            '    veh_rec    VEHrec    LEFT JOIN    prkgpermt_rec    PRKrec    ON    VEHrec.veh_no        =    PRKrec.veh_no'
-            '                    LEFT JOIN    prkgstckr_rec    STKrec    ON    PRKrec.permit_code    =    STKrec.permit_stckrcd'
-            '                                                        AND    VEHrec.acadyr        =    STKrec.permit_acadyr'
+            '   veh_rec    VEHrec   LEFT JOIN    prkgpermt_rec    PRKrec    ON  VEHrec.veh_no       =    PRKrec.veh_no'
+            '                       LEFT JOIN    prkgstckr_rec    STKrec    ON  PRKrec.permit_code  =    STKrec.permit_stckrcd'
+            '                                                               AND VEHrec.acadyr       =    STKrec.permit_acadyr'
             ' WHERE'
             '   TODAY       BETWEEN VEHrec.issued_date AND NVL(VEHrec.inactive_date, TODAY)'
             '   AND'
             '   VEHrec.id       =   %s'
+            '   AND'
+            '   ('
+            '       PRKrec.permt_no     IS  NULL'
+            '       OR'
+            '       TODAY           BETWEEN PRKrec.active_date  AND NVL(PRKrec.inactive_date, TODAY)'
+            '   )'
             '   AND'
             '   VEHrec.acadyr    =    "%s"'
             ' ORDER BY PRKrec.permt_no'
@@ -161,7 +167,7 @@ class Sticker:
         self.inactive_date = sticker.inactive_date
 
     def updateStatus(self, new_status):
-        inactive_date = None
+        inactive_date = '"NULL"'
         if new_status != '' and new_status != 'A':
             inactive_date = "CURRENT"
         updateStickerSQL = (

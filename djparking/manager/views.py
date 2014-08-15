@@ -1,7 +1,7 @@
 import json #added to support ajax calls
 import re
 from . import Individual, Stickers, Sticker, Permit, Makes, Models, Vehicle #custom objects defined in __init__.py
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from django.conf import settings
 from django.core import serializers #added to support ajax calls
 from django.core.urlresolvers import reverse
@@ -130,9 +130,9 @@ def update(request):
                 #If a sticker already exists for the vehicle
                 if veh.permitId != None:
                     #Get the existing sticker attached to the record
-                    sticker = Sticker(veh.permit_code, veh.acad_yr)
+                    sticker = Sticker(veh.permit_code, veh.acad_yr).updateStatus(request.POST.get('permitStatus'))
                     #Change the sticker's status
-                    sticker.updateStatus(request.POST.get('permitStatus'))
+                    #sticker.updateStatus(request.POST.get('permitStatus'))
                     #Inactivate the parking permit record (also clears a lotloctn space)
                     old_permit = Permit(veh.permitId).inactivate()
                 
