@@ -13,5 +13,5 @@ urlpatterns = patterns('',
     # my app
     url(r'^manager/', include('djparking.manager.urls')),
     # redirect
-    url(r'^$', RedirectView.as_view(url="/manager/")),
+    url(r'^$', RedirectView.as_view(url="/forms/parking/manager/")),
 )

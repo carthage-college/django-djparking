@@ -6,10 +6,19 @@
         {% url 'manager_update' as form_url %}
     {% endifequal %}
         
+    {% ifequal vehicle.veh_no 0 %}
+        <p style="clear:both;"><strong>Before selecting a lot when creating a new vehicle record, please check the Lot Summary table in the right column
+        to ensure that there are spots remaining. If the name of the lot is highlighted, that is an indication that the lot is currently
+        at its capacity and no additional permits should be assigned.</strong></p>
+        {% if person.vehicle|length > 1 %}
+        <p><strong>IMPORTANT: This does NOT prevent the assignment of a permit for a record that has already been reserved. If the box (or
+        boxes) listed above indicate an existing reservation, you can still assign and distribute the permit without issue.</strong></p>
+        {% endif %}
+    {% endifequal %}
     <form action="{{form_url}}" method="post" class="{% ifequal vehicle.veh_no 0 %}newForm {% endifequal %}vehicleForm">
         {% csrf_token %}
         <input type="hidden" name="veh_no" data-veh="{{vehicle.veh_no}}" data-student="{{person.id}}" value="{{vehicle.veh_no}}" />
-        <input type="hidden" name="permit_no" data-veh="{{vehicle.veh_no}}" value="{{vehicle.permitId}}" />
+        <input type="hidden" name="permit_no" data-veh="{{vehicle.veh_no}}" value="{{vehicle.permitid}}" />
         <input type="hidden" name="studentId" value="{{person.id}}" />
         <input type="hidden" name="acadYear" value="{{search.acadYear}}" />
         <!-- Search fields, to mimic request -->
@@ -73,7 +82,7 @@
                     {% endfor %}
                 </select>
                 {% comment %}<input type="image" src="http://png-3.findicons.com/files/icons/808/on_stage/128/refresh.png" class="permitRefresh" alt="Refresh Permits" title="Refresh Permits" />{% endcomment %}
-                <input type="hidden" name="initialSticker" data-veh="{{vehicle.veh_no}}" value="{{vehicle.permit_txt}}" />
+                <input type="hidden" name="initialSticker" data-veh="{{vehicle.veh_no}}" value="{% if vehicle.permit_txt %}{{vehicle.permit_txt}}{% endif %}" />
             </div>
         </div>
         <div class="infoField">
@@ -103,7 +112,7 @@
                 </div>
                 <div class="wideField">
                     This permit is:
-                    <select name="permitStatus" data-veh="{{vehicle.veh_no}}" data-student="{{person.id}}" class="chosenDDL">
+                    <select name="permitstatus" data-veh="{{vehicle.veh_no}}" data-student="{{person.id}}" class="chosenDDL">
                         <option value="">Available</option>
                         <option value="A">Assigned</option>
                         <option value="S">Surrendered</option>

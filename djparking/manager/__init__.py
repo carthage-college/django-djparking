@@ -1,18 +1,24 @@
+from datetime import date
 from djzbar.utils.informix import do_sql
 
 class Individual:
     def __init__(self, id, year, acadYear):
+        semester = 'RA'
+        if date.today().month <= 5:
+            semester = 'RC'
+
         #Query the information about the person
         personSQL = (
             ' SELECT'
             '   IDrec.id, TRIM(IDrec.firstname) AS firstname, TRIM(IDrec.lastname) AS lastname, TRIM(SRVrec.bldg) AS bldg'
             ' FROM'
-            '   id_rec    IDrec    INNER JOIN    stu_serv_rec    SRVrec    ON    IDrec.id            =    SRVrec.id'
-            '                                                       AND    SRVrec.yr            =    %s'
+            '   id_rec    IDrec    INNER JOIN    stu_serv_rec    SRVrec     ON  IDrec.id      =    SRVrec.id'
+            '                                                               AND SRVrec.yr    =    %s'
+            '                                                               AND SRVrec.sess =   "%s"'
             ' WHERE'
             '   IDrec.id  =   %s'
             ' GROUP BY id, firstname, lastname, bldg'
-        ) % (year, id)
+        ) % (year, semester, id)
         person = do_sql(personSQL).fetchone()
 
         #Load the record with placeholder data if the query returned no information
@@ -30,7 +36,7 @@ class Individual:
         #Get the vehicle information for the specified user
         vehicleSQL = (
             ' SELECT'
-            '   VEHrec.veh_no, VEHrec.id, VEHrec.model_yr, TRIM(INITCAP(VEHrec.make)) AS make, TRIM(INITCAP(VEHrec.model)) AS model, VEHrec.license, VEHrec.st_plate, PRKrec.permt_no AS permitId,'
+            '   VEHrec.veh_no, VEHrec.id, VEHrec.model_yr, TRIM(INITCAP(VEHrec.make)) AS make, TRIM(INITCAP(VEHrec.model)) AS model, VEHrec.license, VEHrec.st_plate, NVL(PRKrec.permt_no,0) AS permitid,'
             '   PRKrec.lotcode, PRKrec.permit_code, TRIM(PRKrec.permtcmmnt) AS permitcomment, TO_CHAR(PRKrec.active_date, "%%m/%%d/%%Y") AS active_date,'
             '   TO_CHAR(PRKrec.inactive_date, "%%m/%%d/%%Y") AS inactive_date, TRIM(STKrec.permit_txt) AS permit_txt, VEHrec.acadyr AS acad_yr'
             ' FROM'
@@ -70,7 +76,7 @@ class Individual:
         self.vehicle.append(Vehicle())
 
 class Vehicle:
-    def __init__(self, veh_no = 0, id = 0, model_yr = "", make = "", model = "", license = "", st_plate = "", permitId = "", lotcode = "", permit_code = "", permitcomment = "", active_date = None, inactive_date = None, permit_txt = "", acad_yr = "", stickers = None, makes = None, models = None):
+    def __init__(self, veh_no = 0, id = 0, model_yr = "", make = "", model = "", license = "", st_plate = "", permitid = "", lotcode = "", permit_code = "", permitcomment = "", active_date = None, inactive_date = None, permit_txt = "", acad_yr = "", stickers = None, makes = None, models = None):
         self.veh_no = veh_no
         self.id = id
         self.model_yr = model_yr
@@ -78,7 +84,7 @@ class Vehicle:
         self.model = model
         self.license = license
         self.st_plate = st_plate
-        self.permitId = permitId
+        self.permitid = permitid
         self.lotcode = lotcode
         self.permit_code = permit_code
         self.permitcomment = permitcomment
@@ -93,7 +99,7 @@ class Vehicle:
     def load(self, vehicle, stickers, makes, models):
         return Vehicle(
             vehicle.veh_no, vehicle.id, vehicle.model_yr, vehicle.make, vehicle.model, vehicle.license,
-            vehicle.st_plate, vehicle.permitId, vehicle.lotcode, vehicle.permit_code, vehicle.permitcomment,
+            vehicle.st_plate, vehicle.permitid, vehicle.lotcode, vehicle.permit_code, vehicle.permitcomment,
             vehicle.active_date, vehicle.inactive_date, vehicle.permit_txt, vehicle.acad_yr, stickers, makes, models
         )
     
@@ -101,13 +107,13 @@ class Vehicle:
         vehicleSQL = (
             ' SELECT'
             '   VEHrec.veh_no, VEHrec.id, VEHrec.model_yr, TRIM(INITCAP(VEHrec.make)) AS make, TRIM(INITCAP(VEHrec.model)) AS model, VEHrec.license,'
-            '   VEHrec.st_plate, PRKrec.permt_no AS permitId, PRKrec.lotcode, PRKrec.permit_code, TRIM(PRKrec.permtcmmnt) AS permitcomment,'
+            '   VEHrec.st_plate, PRKrec.permt_no AS permitid, PRKrec.lotcode, PRKrec.permit_code, TRIM(PRKrec.permtcmmnt) AS permitcomment,'
             '   TO_CHAR(PRKrec.active_date, "%%m/%%d/%%Y") AS active_date, TO_CHAR(PRKrec.inactive_date, "%%m/%%d/%%Y") AS inactive_date,'
             '   TRIM(STKrec.permit_txt) AS permit_txt, VEHrec.acadyr AS acad_yr'
             ' FROM'
-            '    veh_rec    VEHrec    LEFT JOIN    prkgpermt_rec    PRKrec    ON    VEHrec.veh_no        =    PRKrec.veh_no'
-            '                    LEFT JOIN    prkgstckr_rec    STKrec    ON    PRKrec.permit_code    =    STKrec.permit_stckrcd'
-            '                                                        AND    VEHrec.acadyr        =    STKrec.permit_acadyr'
+            '    veh_rec    VEHrec  LEFT JOIN    prkgpermt_rec    PRKrec    ON  VEHrec.veh_no       =    PRKrec.veh_no'
+            '                       LEFT JOIN    prkgstckr_rec    STKrec    ON  PRKrec.permit_code  =    STKrec.permit_stckrcd'
+            '                                                               AND VEHrec.acadyr       =    STKrec.permit_acadyr'
             ' WHERE'
             '   VEHrec.veh_no   =   %s'
         ) % (veh_no)
@@ -116,7 +122,7 @@ class Vehicle:
         makes = Makes().getByYear(vehicle.model_yr)
         models = Models().getByYearMake(vehicle.model_yr, vehicle.make)
         stickers = Stickers().forLot(vehicle.lotcode, vehicle.acad_yr, vehicle.permit_txt)
-        return Vehicle(vehicle.veh_no, vehicle.id, vehicle.model_yr, vehicle.make, vehicle.model, vehicle.license, vehicle.st_plate, vehicle.permitId, vehicle.lotcode, vehicle.permit_code,
+        return Vehicle(vehicle.veh_no, vehicle.id, vehicle.model_yr, vehicle.make, vehicle.model, vehicle.license, vehicle.st_plate, vehicle.permitid, vehicle.lotcode, vehicle.permit_code,
                        vehicle.permitcomment, vehicle.active_date, vehicle.inactive_date, vehicle.permit_txt, vehicle.acad_yr, makes, models, stickers)
     
     """
@@ -215,13 +221,13 @@ class Permit:
         ) % (lotcode, lotloctn, permit_code, acadyr, student_id, veh_no, comment)
         do_sql(insertPermitSQL)
         
-        getPermitIdSQL = (
+        getpermitidSQL = (
             ' SELECT permt_no'
             ' FROM prkgpermt_rec'
             ' WHERE veh_no = %s'
             ' AND inactive_date IS NULL'
         ) % (veh_no)
-        permit = do_sql(getPermitIdSQL).fetchone()
+        permit = do_sql(getpermitidSQL).fetchone()
         self = Permit(permit.permt_no)
 
     def inactivate(self):

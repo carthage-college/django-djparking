@@ -63,14 +63,18 @@
                 //Initialize autocomplete search box
                 $('#search').autocomplete({
                     source: function(request, response){
-                        $.getJSON('{% url "ajax_search" %}',
-                            {
-                                term:request.term,
-                                acadYear:$('select[name="academicYear"]').val()
-                            }
-                        ).done(function(data){
-                            response(data);
-                        })
+						//Check if an autocomplete record is already present in the search box. If it is, do not perform the search again because the user is most
+						//likely trying to select the field to type a new name
+						if(!/^\w+, \w+ \(\d+\)$/i.test($('#search').val())){
+							$.getJSON('{% url "ajax_search" %}',
+								{
+									term:request.term,
+									acadYear:$('select[name="academicYear"]').val()
+								}
+							).done(function(data){
+								response(data);
+							});
+						}
                     },
                     minLength:2,
                     select:function(event, ui){
@@ -156,7 +160,7 @@
                         $(selPermit).trigger('liszt:updated');
 
                         var permitValues = '';
-                        $.getJSON('../ajax/permits/',
+                        $.getJSON('{% url "ajax_stickers" %}',
                             {
                                 acadYear:$('select[name="academicYear"]').val(),
                                 lotcode:$(selLot).val(),
@@ -183,8 +187,8 @@
                     //Get the veh_no
                     var veh_attr = '[data-veh="' + $(this).data('veh') + '"]';
                     //If the selected sticker has been changed from when the page loaded, show the "permit status" dropdown. Otherwise, hide the dropdown.
-                    $('select[name="permitStatus"]' + veh_attr).parents('form').find('.permitChangeBlock').toggle(
-                        $('select[name="sticker"]' + veh_attr).val () != $('input[name="initialSticker"]' + veh_attr).val()
+                    $('select[name="permitstatus"]' + veh_attr).parents('form').find('.permitChangeBlock').toggle(
+                        $('input[name="initialSticker"]' + veh_attr).val() != '' && $('select[name="sticker"]' + veh_attr).val () != $('input[name="initialSticker"]' + veh_attr).val()
                     );
                 });
 
@@ -333,13 +337,23 @@
             });
         </script>
         <style type="text/css">
-            body {min-width:900px;max-width:1200px;margin:0px auto;/*padding:0px;font-size:12px;*/}
+            body {min-width:900px;max-width:1200px;margin:10px auto;/*padding:0px;font-size:12px;*/}
             .buffer {width:80%;float:left;}
-            .personDetail {padding-left:10px;margin-top:15px;}
+            form#mainSearchForm {
+				padding: 5px 15px;
+			}
+			legend {
+				margin: 0px 10px;
+				padding: 0px 8px;
+				font-size: 1.2em;
+				font-weight: bold;
+			}
+
+			.personDetail {padding-left:10px;margin-top:15px;}
                 .personDetail h3 {padding-top:10px;clear:both;}
                 .personDetail .infoField {float:left;width:140px;}
                 .personDetail .wideField {float:left;width:210px;}
-            .row {clear:both;}
+            .row {clear:both;margin:15px 0px;}
             .summary {width:19%;float:right;}
             .summary h3 {text-align:center;}
             .summary table {border-collapse:collapse;font-size:.85em;width:100%;}
@@ -363,7 +377,7 @@
             select[name="lot"] {width:100px;}
             select[name="st_plate"] {width:70px;}
             select[name="sticker"] {width:110px;}
-            select[name="permitStatus"] {width:100px;}
+            select[name="permitstatus"] {width:100px;}
             select[name="carYear"] {width:80px;}
             select[name="carMake"] {width:125px;}
             select[name="carModel"] {width:115px;}
@@ -377,14 +391,14 @@
     <body>
         <div class="buffer">
             <fieldset>
-                <legend>Search</legend>
+                <legend>Search For Student</legend>
                 <form action="." id="mainSearchForm" method="post">
                     {% csrf_token %}
                     <div class="row">
                         <label>Search:</label>
                         <input type="text" name="searchText" id="search" size="35" value="{{search.text}}" />
                         <input type="hidden" name="searchID" value="{{search.ID}}" />
-                        <input type="button" name="manualSearch" value="Search" />
+                        <!-- <input type="button" name="manualSearch" value="Search" /> -->
                     </div>
                     <div class="row">
                         <label>Academic Year:</label>
@@ -466,9 +480,9 @@
             <table cellpadding="3" cellspacing="0" border="1">
                 <tbody>
                     {% for summaryRow in summary %}
-                        {% ifchanged summaryRow.lotTxt %}
+                        {% ifchanged summaryRow.lot_txt %}
                             <tr>
-                                <th colspan="2" style="text-align:center;">{{summaryRow.lotTxt}}</th>
+                                <th colspan="2" style="text-align:center;{% ifequal summaryRow.lot_status 'Full' %}background-color:#FFFF00;{% endifequal %}">{{summaryRow.lot_txt}}</th>
                             </tr>
                             <tr>
                                 <th>Status</th>

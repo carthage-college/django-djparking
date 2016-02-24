@@ -10,7 +10,8 @@ from django.shortcuts import render_to_response, get_object_or_404
 from django.template import RequestContext, loader, Context
 from django.utils import simplejson
 
-from djtools.utils.mail import send_mail
+#from djtools.utils.mail import send_mail
+from django.core.mail import send_mail
 #Creates connection to informix
 from djzbar.utils.informix import do_sql
 
@@ -41,6 +42,9 @@ def search(request, redir_acad_yr = None, redir_txt = '', redir_id = 0):
     individual = None
     personSQL = ''
     debugvar = ''
+    year = '20' + search['acadYear'][0:2]
+    if date.today().month <= 5:
+        year = '20' + search['acadYear'][2:4]
     if request.method == 'POST':
         search['acadYear'] = request.POST.get('academicYear')
         search['text'] = request.POST.get('searchText')
@@ -53,7 +57,7 @@ def search(request, redir_acad_yr = None, redir_txt = '', redir_id = 0):
     isSearched = False
     if search['ID'] > 0:
         isSearched = True
-        individual = Individual(search['ID'], '20' + search['acadYear'][0:2], search['acadYear'])
+        individual = Individual(search['ID'], year, search['acadYear'])
         lots = getLots(individual.bldg != 'CMTR', individual.bldg == 'APT')
 
     summary = getLotSummary(search['acadYear'])
@@ -91,10 +95,12 @@ def create(request):
 
     if request.POST.get('carMake').lower() == 'zzgenericmake':
         email_data = {'actionType':'created','comment':request.POST.get('permitComment')}
+        """
         send_mail(
             None, ['mkishline@carthage.edu'], 'Generic vehicle in Parking Admin', 'confirmation@carthage.edu',
             'manager/email_genericvehicle.html', email_data
         )
+        """
 
     """
     return render_to_response(
@@ -119,28 +125,55 @@ def update(request):
         veh = Vehicle().loadByID(int(vehicleUpdate))
         #If a sticker was specified, create the permit record
         if request.POST.get('sticker') != '' and request.POST.get('sticker') != None:
-            if request.POST.get('permitStatus') == '' or request.POST.get('permitStatus') == None:
+            if request.POST.get('permitstatus') == '' or request.POST.get('permitstatus') == None:
                 vehicleUpdate = permitUpdate(
                     request.POST.get('permit_no'),
                     request.POST.get('active_date'),
                     request.POST.get('inactive_date'),
                     request.POST.get('permitComment')
                 )
+                
+                #assignSticker(sticker_txt, veh_no, active_date, permit_no = None, inactive_date = None, permit_comment = ''):
+                
+                """
+                assignStickerNoInsert(
+                    request.POST.get('sticker'),
+                    request.POST.get('veh_no'),
+                    request.POST.get('permit_no'),
+                    request.POST.get('active_date')
+                )
+                """
+                assignSticker(
+                    request.POST.get('sticker'),
+                    request.POST.get('veh_no'),
+                    request.POST.get('active_date'),
+                    request.POST.get('permit_no')
+                )
             else:
                 #If a sticker already exists for the vehicle
-                if veh.permitId != None:
+                if veh.permitid != None and veh.permitid > 0:
                     #Get the existing sticker attached to the record
-                    sticker = Sticker(veh.permit_code, veh.acad_yr).updateStatus(request.POST.get('permitStatus'))
+                    sticker = Sticker(veh.permit_code, veh.acad_yr).updateStatus(request.POST.get('permitstatus'))
                     #Change the sticker's status
-                    #sticker.updateStatus(request.POST.get('permitStatus'))
+                    #sticker.updateStatus(request.POST.get('permitstatus'))
                     #Inactivate the parking permit record (also clears a lotloctn space)
-                    old_permit = Permit(veh.permitId).inactivate()
-                
+                    old_permit = Permit(veh.permitid).inactivate()
+
                 #Assign the sticker to the vehicle (creates the permit record)
+                """
                 assignStickerToVehicle(
                     request.POST.get('sticker'),
-                    vehicleUpdate,
+                    request.POST.get('veh_no'),
                     request.POST.get('active_date'),
+                    request.POST.get('inactive_date'),
+                    request.POST.get('permitComment')
+                )
+                """
+                assignSticker(
+                    request.POST.get('sticker'),
+                    request.POST.get('veh_no'),
+                    request.POST.get('active_date'),
+                    request.POST.get('permit_no'),
                     request.POST.get('inactive_date'),
                     request.POST.get('permitComment')
                 )
@@ -173,11 +206,11 @@ def getLots(isResident = None, isInApt = None, isMotorcycle = None, includeFull 
         lotSQL = (' SELECT  TRIM(spaces.lotcode) AS lotcode, TRIM(lot.txt) AS txt, COUNT(spaces.lotloctn) AS spots'
                   ' FROM    lot_table   lot INNER JOIN  prkglot_rec spaces  ON  lot.lotcode =   spaces.lotcode'
                   ' WHERE   TODAY            BETWEEN    lot.active_date     AND NVL(lot.inactive_date, TODAY)'
-                  ' AND     spaces.lot_stat    =        ""'
+                  #' AND     spaces.lot_stat    =        ""'
                   ' AND'
                   ' ('
                  )
-    
+
         #Check if arguments were passed into the function
         if isResident != None:
             #If the individual is a campus resident they have access to
@@ -191,8 +224,8 @@ def getLots(isResident = None, isInApt = None, isMotorcycle = None, includeFull 
                 lotSQL += ' lot.lotcode = "CMTR"'
 
         lotSQL += ') GROUP BY spaces.lotcode, lot.txt'
-        if not includeFull or includeFull == 'false':
-            lotSQL += ' HAVING COUNT(spaces.lotloctn) > 0'
+        #if not includeFull or includeFull == 'false':
+        #    lotSQL += ' HAVING COUNT(spaces.lotloctn) > 0'
         lotSQL += ' ORDER BY TRIM(lot.txt)'
 
     try:
@@ -218,26 +251,39 @@ def getStates():
 def getLotSummary(acadYear):
     summarySQL = (
         " SELECT"
-        "    TRIM(lot_table.txt) lotTxt,"
+        "    TRIM(lot_table.txt) lot_txt,"
         "    CASE TRIM(lot_rec.lot_stat)"
         "        WHEN    'A'    THEN    'Allocated/Sold'"
         "        WHEN    ''     THEN    'Available'"
         "        WHEN    'S'    THEN    'Held in Reserve'"
-        #"        WHEN    'R'    THEN    'Reserved (dumpsters/construction)'"
+        "        WHEN    'R'    THEN    'Reserved (dumpsters/construction)'"
         #"        WHEN    'R'    THEN    'Dumpster'"
         "        WHEN    'H'    THEN    'Handicap'"
         "        WHEN    'W'    THEN    'Waitlist'"
         #"        WHEN    'F'    THEN    'Fleet Vehicle'"
         "    END AS status,"
-        "    COUNT(*) AS spaces"
+        "    COUNT(*) AS spaces,"
+        "    CASE"
+    	"        WHEN	NVL(lotSpaces.hasSpaces,0)	=	0	THEN	'Full'"
+    	"									                ELSE	'Available'"
+        "    END	AS	lot_status"
         " FROM  prkglot_rec lot_rec INNER JOIN  lot_table   ON  lot_rec.lotcode     =   lot_table.lotcode"
-        "                                                   AND lot_rec.lot_acadyr  =   lot_table.acadyr"
+        #"                                                   AND lot_rec.lot_acadyr  =   lot_table.acadyr"
+		"   					    LEFT JOIN	("
+		"						        SELECT lotcode, COUNT(*) hasSpaces"
+		"       						FROM prkglot_rec"
+		"       						WHERE lot_stat = ''"
+		"       						AND lot_acadyr = '%s'"
+		"       						GROUP BY lotcode"
+		"       					)			lotSpaces	ON	lot_rec.lotcode	=	lotSpaces.lotcode"
         " WHERE TODAY BETWEEN lot_rec.active_date AND NVL(lot_rec.inactive_date, TODAY)"
-        " AND   acadyr  =   '%s'"
+		" AND TODAY BETWEEN lot_table.active_date AND NVL(lot_table.inactive_date, TODAY)"
+        #" AND   acadyr  =   '%s'"
+		" AND	lot_acadyr	=	'%s'"
         " AND   lot_rec.lot_stat    NOT IN  ('R','F')"
-        " GROUP BY  lotTxt, lot_rec.lot_stat"
-        " ORDER BY  lotTxt, status"
-    ) % (acadYear)
+        " GROUP BY  lot_txt, lot_rec.lot_stat, lot_status"
+        " ORDER BY  lot_txt, status"
+    ) % (acadYear, acadYear)
     return do_sql(summarySQL).fetchall()
 
 #SQL commented out to prevent accidental inserts
@@ -352,8 +398,9 @@ def assignStickerToVehicle(sticker_txt, veh_no, active_date, inactive_date = Non
             "       FROM    prkglot_rec"
             "       WHERE   lotcode = '%s'"
             "       AND     lot_stat = ''"
+            "       AND     lot_acadyr = '%s'"
             "   )"
-        )   %   (vehicle.id, veh_no, sticker.permit_assocdlot, sticker.permit_assocdlot)
+        )   %   (vehicle.id, veh_no, sticker.permit_assocdlot, sticker.permit_assocdlot, vehicle.acad_yr)
         do_sql(consumeLotLocationSQL)
 
         #Get lot location detail
@@ -375,6 +422,180 @@ def assignStickerToVehicle(sticker_txt, veh_no, active_date, inactive_date = Non
         return -1
 
     return None
+
+def assignStickerNoInsert(sticker_txt, veh_no, permit_no, active_date):
+    vehicle = Vehicle().loadByID(veh_no)
+    
+    selectStickerSQL = (
+        " SELECT stckr.*"
+        " FROM prkgstckr_rec stckr"
+        " WHERE stckr.permit_txt = '%s'"
+        " AND stckr.permt_stat = ''"
+    ) % (sticker_txt)
+    sticker_results = do_sql(selectStickerSQL)
+    
+    if sticker_results != None:
+        sticker_current = sticker_results.fetchone()
+        
+        updateStickerSQL = (
+            " UPDATE prkgstckr_rec"
+            " SET permt_stat = 'A'"
+            " , issue_date = '%s'"
+            " WHERE"
+            " permit_stckrcd = '%s'"
+        ) % (active_date, sticker_current.permit_stckrcd)
+        do_sql(updateStickerSQL)
+        
+        consumeLotLocationSQL = (
+            " UPDATE prkglot_rec"
+            " SET lot_stat = 'A'"
+            " , lotcmmnt = '%s,%s'"
+            " WHERE"
+            "   lotcode = '%s'"
+            "   AND"
+            "   lotloctn = ("
+            "       SELECT MIN(lotloctn)"
+            "       FROM    prkglot_rec"
+            "       WHERE   lotcode = '%s'"
+            "       AND     lot_stat = ''"
+            "   )"
+        )   %   (vehicle.id, veh_no, sticker_current.permit_assocdlot, sticker_current.permit_assocdlot)
+        do_sql(consumeLotLocationSQL)
+
+        getLotLocationSQL = (
+            " SELECT prkglot_rec.*"
+            " FROM prkglot_rec"
+            " WHERE lotcmmnt = '%s,%s'"
+        ) % (vehicle.id, veh_no)
+        lot_loc = do_sql(getLotLocationSQL).fetchone()
+        
+        updatePermitSQL = (
+            " UPDATE prkgpermt_rec"
+            " SET lotcode = '%s'"
+            " , lotloctn = '%s'"
+            " , permit_code = '%s'"
+            " , permt_stat = 'A'"
+            " WHERE permt_no = %s"
+        ) % (sticker_current.permit_assocdlot, lot_loc.lotloctn, sticker_current.permit_stckrcd, permit_no)
+        do_sql(updatePermitSQL)
+
+def assignSticker(sticker_txt, veh_no, active_date, permit_no = 0, inactive_date = None, permit_comment = ''):
+    vehicle = Vehicle().loadByID(veh_no)
+    
+    selectStickerSQL = (
+        " SELECT stckr.*"
+        " FROM prkgstckr_rec stckr"
+        " WHERE stckr.permit_txt = '%s'"
+        " AND stckr.permt_stat = ''"
+    ) % (sticker_txt)
+    sticker_results = do_sql(selectStickerSQL)
+    
+    if sticker_results != None:
+        sticker_current = sticker_results.fetchone()
+        
+        updateStickerSQL = (
+            " UPDATE prkgstckr_rec"
+            " SET permt_stat = 'A'"
+            " , issue_date = '%s'"
+            " WHERE"
+            " permit_stckrcd = '%s'"
+            " AND permit_acadyr = '%s'"
+        ) % (active_date, sticker_current.permit_stckrcd, vehicle.acad_yr)
+        do_sql(updateStickerSQL)
+
+        getLotLocationSQL = (
+            " SELECT"
+            "    FIRST 1 lotloctn"
+            " FROM"
+            "    ("
+            "        SELECT"
+            "            lot_rec.lotloctn,"
+            "            CASE"
+            "                WHEN	lot_rec.lot_stat	=	'A' THEN	0"
+            "                                                   ELSE	lot_rec.lotloctn::integer"
+            "            END AS priority"
+            "        FROM"
+            "            prkglot_rec	lot_rec	LEFT JOIN	prkgpermt_rec	permit_rec	ON	lot_rec.lotcode		=	permit_rec.lotcode"
+            "                                                                        AND	lot_rec.lot_acadyr	=	permit_rec.acadyr"
+            "                                                                        AND	lot_rec.lotloctn	=	permit_rec.lotloctn"
+            "        WHERE"
+            "            lot_rec.lotcode		=	'%s'"
+            "            AND"
+            "            lot_rec.lot_acadyr	=	'%s'"
+            "            AND"
+            "            ("
+            "                lot_rec.lot_stat	=	''"
+            "                OR"
+            "                ("
+            "                    lot_rec.lot_stat	=	'A'"
+            "                    AND"
+            "                    permit_rec.permt_no	IS	NOT NULL"
+            "                    AND"
+            "                    permit_rec.permt_no	=	%s"
+            "                )"
+            "            )"
+            "        ORDER BY lot_stat DESC, lot_rec.lotloctn"
+            "    )"
+        ) % (sticker_current.permit_assocdlot, vehicle.acad_yr, permit_no)
+        lot_loc = do_sql(getLotLocationSQL).first()
+
+        consumeLotLocationSQL = (
+            " UPDATE prkglot_rec"
+            " SET lot_stat = 'A'"
+            " , lotcmmnt = '%s,%s'"
+            " WHERE"
+            "   lotcode = '%s'"
+            "   AND"
+            "   lot_acadyr = '%s'"
+            "   AND"
+            "    lotloctn = '%s'"
+            #"   lotloctn = ("
+            #"       SELECT MIN(lotloctn)"
+            #"       FROM    prkglot_rec"
+            #"       WHERE   lotcode = '%s'"
+            #"       AND     lot_stat = ''"
+            #"       AND     lot_acadyr = '%s'"
+            #"   )"
+        )   %   (vehicle.id, veh_no, sticker_current.permit_assocdlot, vehicle.acad_yr, lot_loc.lotloctn)
+        #)   %   (vehicle.id, veh_no, sticker_current.permit_assocdlot, vehicle.acad_yr, sticker_current.permit_assocdlot, vehicle.acad_yr)
+        do_sql(consumeLotLocationSQL)
+
+        """
+        getLotLocationSQL = (
+            " SELECT prkglot_rec.*"
+            " FROM prkglot_rec"
+            " WHERE lotcmmnt = '%s,%s'"
+            " AND lot_acadyr = '%s'"
+        ) % (vehicle.id, veh_no, vehicle.acad_yr)
+        #lot_loc = do_sql(getLotLocationSQL).fetchone()
+        lot_loc = do_sql(getLotLocationSQL).first()
+        """
+        
+        if vehicle.id == 1319170:
+            send_mail("Debug parking",
+                "Student: %s\n permit_no: %s\n lotloctn: %s\n int permit number is 0: %s" % (vehicle.id, permit_no, lot_loc.lotloctn, int(permit_no) == 0),
+                "confirmation@carthage.edu",['mkishline@carthage.edu'],
+                fail_silently=True
+            )
+        
+        if permit_no == 0:
+            permitSQL = (
+                " INSERT INTO prkgpermt_rec (lotcode, lotloctn, permit_code, acadyr, permt_id, veh_no, permt_stat, active_date, inactive_date, permtcmmnt)"
+                " VALUES ('%s', '%s', '%s', '%s', %s, %s, '%s', '%s', '%s', '%s')"
+            ) % (sticker.permit_assocdlot, lot_loc.lotloctn, sticker.permit_stckrcd, vehicle.acad_yr, vehicle.id, veh_no, 'A', active_date, inactive_date, permit_comment)
+        else:
+            permitSQL = (
+                " UPDATE prkgpermt_rec"
+                " SET lotcode = '%s'"
+                " , lotloctn = '%s'"
+                " , permit_code = '%s'"
+                " , permt_stat = 'A'"
+                " WHERE permt_no = %s"
+            ) % (sticker_current.permit_assocdlot, lot_loc.lotloctn, sticker_current.permit_stckrcd, permit_no)
+
+        if vehicle.id == 1319170:
+            send_mail("Debug parking SQL","%s" % (permitSQL), 'confirmation@carthage.edu', ['mkishline@carthage.edu'], fail_silently=True)
+        do_sql(permitSQL)
 
 def removeStickerFromVehicle(permit_status, veh_no):
     #Update prkgpermt_rec (set inactive date)
@@ -403,7 +624,7 @@ def removeStickerFromVehicle(permit_status, veh_no):
         " WHERE veh_no = %s"
     ) % (veh_no)
     """
-    Permit(vehicle.permitId).inactivate()
+    Permit(vehicle.permitid).inactivate()
 
     return None
 
@@ -471,6 +692,8 @@ def ajaxSearch(request):
     #Academic year is passed as part of the URL. Since academic years are a concatenation of the last two digits of the years (ie 1314 = 2013-2014)
     #we simply take the first two characters and prepend "20" resulting in "2013"
     thisYear = '20' + acadYear[0:2]
+    if date.today().month <= 5:
+        thisYear = '20' + acadYear[2:4]
 
     searchSQL = (
         ' SELECT'
