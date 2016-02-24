@@ -1,6 +1,5 @@
 {% comment %} {% extends "base.html" %} {% endcomment %}
 {% comment %}
-{% load get_api %}
 {% block title %}&mdash; Carthage College{% endblock %}
 {% block columns %}{% endblock %}
 {% block extra_style %}{% endblock %}
@@ -10,9 +9,9 @@
 
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
 <html lang="en">
-	<head>
+    <head>
         <title>Carthage Parking Administration</title>
-		<meta charset="utf-8" />
+        <meta charset="utf-8" />
 
         <link href="//fonts.googleapis.com/css?family=Open+Sans:300,400,600,700" type="text/css" rel="stylesheet">
         <link href="//www.carthage.edu/themes/korra/assets/css/master.css" type="text/css" rel="stylesheet" />
@@ -31,7 +30,7 @@
         <script src="//ajax.googleapis.com/ajax/libs/jquery/1.11.0/jquery.min.js" type="text/javascript"></script>
         <script src="//ajax.googleapis.com/ajax/libs/jqueryui/1.10.4/jquery-ui.min.js"></script>
 
-		<script type="text/javascript" src="https://www.carthage.edu/housing/scripts/chosen/chosen.jquery.min.js"></script>
+        <script type="text/javascript" src="https://www.carthage.edu/housing/scripts/chosen/chosen.jquery.min.js"></script>
         <script type="text/javascript" src="https://www.carthage.edu/housing/scripts/utility.js"></script>
 
         <script src="//www.carthage.edu/themes/korra/assets/js/jquery.cycle2.min.js" type="text/javascript"></script>
@@ -44,17 +43,14 @@
             function relateDatePickers($obj, selectedDate){
                 //Determine whether the current control is the active or inactive date
                 var isActive = new RegExp('^active_date$').test($obj.attr('name'));
-                
                 //Based on the current control, set the jQuery selector (otherField) and the datepicker option setting (datepickerOption)
                 var otherField = isActive ? 'inactive_date' : 'active_date',
                     datepickerOption = isActive ? 'minDate' : 'maxDate';
-                
                 $('input[name="' + otherField + '"][data-veh="' + $obj.data('veh') + '"]').datepicker('option', datepickerOption, selectedDate);
             }
 
             $(document).ready(function(){
                 var LOADING_MESSAGE = 'Loading...';
-                
                 //Because of the quirk in the default autocomplete, we add a button that will not cause the results menu to collapse, even if the control loses focus
                 $('input[name="manualSearch"]').click(function(){
                     $('#search').autocomplete('search', $('#search').val());
@@ -93,7 +89,6 @@
                     $(this).parents('form.vehicleForm').find('input[name="takeAction"]').val('delete');
                     $(this).parents('form.vehicleForm').submit();
                 }).button();
-                
                 $('.iconAdd').click(function() {
                     alert('Add a new vehicle record');
                     var errors = '';
@@ -138,7 +133,6 @@
                     relateDatePickers($(this), $(this).val());
                 });
                 $('input[name="original_inactive_date"]').datepicker({
-                    
                 });
 
                 $('select[name="lot"]').each(function(){
@@ -220,7 +214,6 @@
                     var selYear = 'select[name="carYear"][data-veh="' + thisVeh + '"]',
                         selMake = 'select[name="carMake"][data-veh="' + thisVeh + '"]',
                         selModel = 'select[name="carModel"][data-veh="' + thisVeh + '"]';
-        
                     //Initialize the "onchange" event for each Year select box
                     $(selYear).change(function(){
                         //Clear the values in the make and model dropdowns
@@ -258,7 +251,6 @@
                 $('select[name="carMake"]').each(function(){
                     //Store the veh_no and make of the vehicle
                     var thisVeh = $(this).data('veh');
-                        
                     //Build the jQuery selector strings
                     var selYear = 'select[name="carYear"][data-veh="' + thisVeh + '"]',
                         selModel = 'select[name="carModel"][data-veh="' + thisVeh + '"]',
@@ -268,7 +260,6 @@
                     $('select[name="carMake"][data-veh="' + thisVeh + '"]').change(function(){
                         var thisMake = $(this).val(),
                             isMotorcycle = thisMake == 'Motorcycle';
-                        
                         //Clear the values from the model dropdown
                         clearSelect(selModel);
                         //Put a loading placeholder in the model select box
@@ -321,7 +312,6 @@
                             //If something goes wrong, let the user know and log the error to the console for debugging.
                             alert('Unable to retrieve the list of Models. Please try again.');
                             console.log('Request failed: ' + textStatus + ', ' + error);
-                            
                             //If the request failed, clear the loading message
                             clearSelect(selModel);
                         }).always(function(){
@@ -411,12 +401,10 @@
                     </fieldset>
                 {% endif %}
             {% endif %}
-            
             {% if debug %}
                 <h1>Debug</h1>
                 {{debug}}
             {% endif %}
-            
             {% comment %}
             <style type="text/css">
                 .done {text-decoration:line-through;}
@@ -425,32 +413,32 @@
             <ol>
                 <li class="done">If we know the lot, how do we get a list of the available permits? (Add lotcode to prkgstckr_rec)</li>
                 <li class="done">Explain the automated process that assigns permits to a vehicle record. (Not an issue with change to #1)</li>
-				<li class="done">Do we need a search by last name feature or are ID and permit enough? (license plate for security, last name leading to single selection)</li>
-				<li class="done">Is the right way to handle lot costs to decrement them monthly through the year?</li>
+                <li class="done">Do we need a search by last name feature or are ID and permit enough? (license plate for security, last name leading to single selection)</li>
+                <li class="done">Is the right way to handle lot costs to decrement them monthly through the year?</li>
                 <li>What changes when a permit is forfeited? (Inactivate prkgprmt_rec [S = Surrender, L = Lost, D=Damaged/Destroyed] and prkgstckr_rec)</li>
                 <li>What happens when we initialize a new year (create new allotment of permits, etc)?</li>
                 <li>Does the Business Office need the ability to specify the inactive date of a vehicle record or can we just automate it to today? (still a question)</li>
-				<li>Are all non-AdultEd permits only good for one year? If so, can we set a default expiration date of August preceding the start of the next academic year?</li>
-				<li>What (if any) types of reporting would be necessary through these screens?</li>
-				<li>What are the dates for various payments ($75 at start, full amount during sign-up, etc)</li>
-				<li>Possible data model changes:
-					<ol>
-						<li>Drop veh_table, vehcolor_table, vehicle_rec, vehmake_table</li>
-						<li>Remove permit_stat from prkgprmt_rec (approved)</li>
-						<li class="done">Create relationship between lot_table and prkgstckr_rec</li>
-						<li class="done">Create a rate table linked to lot_table</li>
-					</ol>
-				</li>
+                <li>Are all non-AdultEd permits only good for one year? If so, can we set a default expiration date of August preceding the start of the next academic year?</li>
+                <li>What (if any) types of reporting would be necessary through these screens?</li>
+                <li>What are the dates for various payments ($75 at start, full amount during sign-up, etc)</li>
+                <li>Possible data model changes:
+                    <ol>
+                        <li>Drop veh_table, vehcolor_table, vehicle_rec, vehmake_table</li>
+                        <li>Remove permit_stat from prkgprmt_rec (approved)</li>
+                        <li class="done">Create relationship between lot_table and prkgstckr_rec</li>
+                        <li class="done">Create a rate table linked to lot_table</li>
+                    </ol>
+                </li>
             </ol>
-			<h2>Questions for Business Office</h2>
-			<ol>
-				<li>Is it valuable to know whether a sticker has been sent out?</li>
-				<li>If so, is the date that it was sent out important?</li>
-				<li>When do you know the text and count for the permits for each parking lot?</li>
-				<li>Motorcycles, bicycles, and Adult Education</li>
-				<li class="done">What are the changes to lot capacity for the upcoming year?</li>
-				<li class="done">What are the dates for various payments ($75 at start, full amount during sign-up, etc)</li>
-			</ol>
+            <h2>Questions for Business Office</h2>
+            <ol>
+                <li>Is it valuable to know whether a sticker has been sent out?</li>
+                <li>If so, is the date that it was sent out important?</li>
+                <li>When do you know the text and count for the permits for each parking lot?</li>
+                <li>Motorcycles, bicycles, and Adult Education</li>
+                <li class="done">What are the changes to lot capacity for the upcoming year?</li>
+                <li class="done">What are the dates for various payments ($75 at start, full amount during sign-up, etc)</li>
+            </ol>
             <ul>
                 <li>Email citations to students, citation history</li>
                 <li>No data entry for adult ed office</li>
