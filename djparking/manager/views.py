@@ -1,6 +1,7 @@
 import json #added to support ajax calls
 import re
-from . import Individual, Stickers, Sticker, Permit, Makes, Models, Vehicle #custom objects defined in __init__.py
+#custom objects defined in __init__.py
+from . import Individual, Stickers, Sticker, Permit, Makes, Models, Vehicle
 from datetime import date, datetime, timedelta
 from django.conf import settings
 from django.core import serializers #added to support ajax calls
@@ -8,12 +9,13 @@ from django.core.urlresolvers import reverse
 from django.http import HttpResponseRedirect, HttpResponse
 from django.shortcuts import render_to_response, get_object_or_404
 from django.template import RequestContext, loader, Context
-from django.utils import simplejson
 
 #from djtools.utils.mail import send_mail
 from django.core.mail import send_mail
 #Creates connection to informix
 from djzbar.utils.informix import do_sql
+
+import simplejson
 
 if settings.DEBUG:
     TO_LIST = ["mkishline@carthage.edu",]
