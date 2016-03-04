@@ -85,7 +85,8 @@ def create(request):
         request.POST.get('carYear'),
         request.POST.get('acadYear')
     )
-    #If a sticker was specified and the status was changed, create the permit record
+    # If a sticker was specified and the status was changed,
+    # create the permit record
     if request.POST.get('sticker') != '' and request.POST.get('sticker') != None:
         assignStickerToVehicle(
             request.POST.get('sticker'),
@@ -96,7 +97,9 @@ def create(request):
         )
 
     if request.POST.get('carMake').lower() == 'zzgenericmake':
-        email_data = {'actionType':'created','comment':request.POST.get('permitComment')}
+        email_data = {
+            'actionType':'created','comment':request.POST.get('permitComment')
+        }
         """
         send_mail(
             None, ['mkishline@carthage.edu'], 'Generic vehicle in Parking Admin', 'confirmation@carthage.edu',
@@ -111,7 +114,15 @@ def create(request):
         context_instance=RequestContext(request)
     )
     """
-    return HttpResponseRedirect(reverse('manager_search_redirect', kwargs={'redir_id':request.POST.get('studentId'),'redir_acad_yr':request.POST.get('acadYear')}))
+    return HttpResponseRedirect(
+        reverse(
+            'manager_search_redirect',
+            kwargs={
+                'redir_id':request.POST.get('studentId'),
+                'redir_acad_yr':request.POST.get('acadYear')
+            }
+        )
+    )
 
 def update(request):
     if request.POST.get('takeAction') == "update":
@@ -134,9 +145,9 @@ def update(request):
                     request.POST.get('inactive_date'),
                     request.POST.get('permitComment')
                 )
-                
+
                 #assignSticker(sticker_txt, veh_no, active_date, permit_no = None, inactive_date = None, permit_comment = ''):
-                
+
                 """
                 assignStickerNoInsert(
                     request.POST.get('sticker'),
@@ -185,7 +196,7 @@ def update(request):
         vehicleUpdate = "Delete"
     else:
         vehicleUpdate = ("Action '%s' did not match") % (request.POST.get('takeAction'))
-    
+
     """
     return render_to_response(
         "manager/success.html",
@@ -376,7 +387,6 @@ def assignStickerToVehicle(sticker_txt, veh_no, active_date, inactive_date = Non
 
     if sticker_results != None:
         sticker = sticker_results.fetchone()
-        
         #Update prkgstckr_rec (flag sticker as sold)
         updateStickerSQL = (
             " UPDATE prkgstckr_rec"
@@ -427,7 +437,7 @@ def assignStickerToVehicle(sticker_txt, veh_no, active_date, inactive_date = Non
 
 def assignStickerNoInsert(sticker_txt, veh_no, permit_no, active_date):
     vehicle = Vehicle().loadByID(veh_no)
-    
+
     selectStickerSQL = (
         " SELECT stckr.*"
         " FROM prkgstckr_rec stckr"
@@ -435,10 +445,10 @@ def assignStickerNoInsert(sticker_txt, veh_no, permit_no, active_date):
         " AND stckr.permt_stat = ''"
     ) % (sticker_txt)
     sticker_results = do_sql(selectStickerSQL)
-    
+
     if sticker_results != None:
         sticker_current = sticker_results.fetchone()
-        
+
         updateStickerSQL = (
             " UPDATE prkgstckr_rec"
             " SET permt_stat = 'A'"
@@ -447,7 +457,7 @@ def assignStickerNoInsert(sticker_txt, veh_no, permit_no, active_date):
             " permit_stckrcd = '%s'"
         ) % (active_date, sticker_current.permit_stckrcd)
         do_sql(updateStickerSQL)
-        
+
         consumeLotLocationSQL = (
             " UPDATE prkglot_rec"
             " SET lot_stat = 'A'"
@@ -470,7 +480,7 @@ def assignStickerNoInsert(sticker_txt, veh_no, permit_no, active_date):
             " WHERE lotcmmnt = '%s,%s'"
         ) % (vehicle.id, veh_no)
         lot_loc = do_sql(getLotLocationSQL).fetchone()
-        
+
         updatePermitSQL = (
             " UPDATE prkgpermt_rec"
             " SET lotcode = '%s'"
@@ -483,7 +493,7 @@ def assignStickerNoInsert(sticker_txt, veh_no, permit_no, active_date):
 
 def assignSticker(sticker_txt, veh_no, active_date, permit_no = 0, inactive_date = None, permit_comment = ''):
     vehicle = Vehicle().loadByID(veh_no)
-    
+
     selectStickerSQL = (
         " SELECT stckr.*"
         " FROM prkgstckr_rec stckr"
@@ -491,10 +501,10 @@ def assignSticker(sticker_txt, veh_no, active_date, permit_no = 0, inactive_date
         " AND stckr.permt_stat = ''"
     ) % (sticker_txt)
     sticker_results = do_sql(selectStickerSQL)
-    
-    if sticker_results != None:
-        sticker_current = sticker_results.fetchone()
-        
+    sticker_current = sticker_results.fetchone()
+
+    if sticker_current:
+
         updateStickerSQL = (
             " UPDATE prkgstckr_rec"
             " SET permt_stat = 'A'"
@@ -572,14 +582,14 @@ def assignSticker(sticker_txt, veh_no, active_date, permit_no = 0, inactive_date
         #lot_loc = do_sql(getLotLocationSQL).fetchone()
         lot_loc = do_sql(getLotLocationSQL).first()
         """
-        
+
         if vehicle.id == 1319170:
             send_mail("Debug parking",
                 "Student: %s\n permit_no: %s\n lotloctn: %s\n int permit number is 0: %s" % (vehicle.id, permit_no, lot_loc.lotloctn, int(permit_no) == 0),
                 "confirmation@carthage.edu",['mkishline@carthage.edu'],
                 fail_silently=True
             )
-        
+
         if permit_no == 0:
             permitSQL = (
                 " INSERT INTO prkgpermt_rec (lotcode, lotloctn, permit_code, acadyr, permt_id, veh_no, permt_stat, active_date, inactive_date, permtcmmnt)"
