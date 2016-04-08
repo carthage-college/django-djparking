@@ -204,7 +204,18 @@ def update(request):
         context_instance=RequestContext(request)
     )
     """
-    return HttpResponseRedirect(reverse('manager_search_redirect', kwargs={'redir_id':request.POST.get('searchID'),'redir_acad_yr':request.POST.get('academicYear')}))
+    if request.POST.get('searchID') and request.POST.get('academicYear'):
+        redirect = reverse(
+            'manager_search_redirect',
+            kwargs={
+                'redir_id':request.POST.get('searchID'),
+                'redir_acad_yr':request.POST.get('academicYear')
+            }
+        )
+    else:
+        redirect = reverse('manager_search')
+
+    return HttpResponseRedirect(redirect)
 
 #Get the collection of lots that are available to an individual given their residency information
 def getLots(isResident = None, isInApt = None, isMotorcycle = None, includeFull = False):
