@@ -197,14 +197,7 @@ def update(request):
     else:
         vehicleUpdate = ("Action '%s' did not match") % (request.POST.get('takeAction'))
 
-    """
-    return render_to_response(
-        "manager/success.html",
-        {'debug':vehicleUpdate},
-        context_instance=RequestContext(request)
-    )
-    """
-    if request.POST.get('searchID') and request.POST.get('academicYear'):
+    try:
         redirect = reverse(
             'manager_search_redirect',
             kwargs={
@@ -212,7 +205,7 @@ def update(request):
                 'redir_acad_yr':request.POST.get('academicYear')
             }
         )
-    else:
+    except:
         redirect = reverse('manager_search')
 
     return HttpResponseRedirect(redirect)
@@ -395,9 +388,9 @@ def assignStickerToVehicle(sticker_txt, veh_no, active_date, inactive_date = Non
         " AND sticker.permt_stat = ''"
     ) % (sticker_txt)
     sticker_results = do_sql(selectStickerSQL)
+    sticker = sticker_results.fetchone()
 
-    if sticker_results != None:
-        sticker = sticker_results.fetchone()
+    if sticker != None:
         #Update prkgstckr_rec (flag sticker as sold)
         updateStickerSQL = (
             " UPDATE prkgstckr_rec"
