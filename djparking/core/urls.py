@@ -9,7 +9,7 @@ handler404 = 'djtools.views.errors.four_oh_four_error'
 handler500 = 'djtools.views.errors.server_error'
 
 urlpatterns = patterns('',
-    url(r'^admin/', include(admin.site.urls)),
+    #url(r'^admin/', include(admin.site.urls)),
     # my app
     url(r'^manager/', include('djparking.manager.urls')),
     # redirect
