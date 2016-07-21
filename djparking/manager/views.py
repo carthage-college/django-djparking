@@ -114,15 +114,20 @@ def create(request):
         context_instance=RequestContext(request)
     )
     """
-    return HttpResponseRedirect(
-        reverse(
+
+    try:
+        redirect = reverse(
             'manager_search_redirect',
             kwargs={
-                'redir_id':request.POST.get('studentId'),
-                'redir_acad_yr':request.POST.get('acadYear')
+                'redir_id':request.POST.get('searchID'),
+                'redir_acad_yr':request.POST.get('academicYear')
             }
         )
-    )
+    except:
+        redirect = reverse('manager_search')
+
+    return HttpResponseRedirect(redirect)
+
 
 def update(request):
     if request.POST.get('takeAction') == "update":
