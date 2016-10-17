@@ -60,7 +60,8 @@ def search(request, redir_acad_yr = None, redir_txt = '', redir_id = 0):
     if search['ID'] > 0:
         isSearched = True
         individual = Individual(search['ID'], year, search['acadYear'])
-        lots = getLots(individual.bldg != 'CMTR', individual.bldg == 'APT')
+        #lots = getLots(individual.bldg != 'CMTR', individual.bldg == 'APT')
+        lots = getLots(individual.bldg != 'CMTR' and individual.bldg != 'OFF', individual.bldg == 'APT')
 
     summary = getLotSummary(search['acadYear'])
 
