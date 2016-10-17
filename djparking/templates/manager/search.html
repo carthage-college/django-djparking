@@ -59,20 +59,21 @@
                 //Initialize autocomplete search box
                 $('#search').autocomplete({
                     source: function(request, response){
-						//Check if an autocomplete record is already present in the search box. If it is, do not perform the search again because the user is most
-						//likely trying to select the field to type a new name
-						if(!/^\w+, \w+ \(\d+\)$/i.test($('#search').val())){
-							$.getJSON('{% url "ajax_search" %}',
-								{
-									term:request.term,
-									acadYear:$('select[name="academicYear"]').val()
-								}
-							).done(function(data){
-								response(data);
-							});
-						}
+                        //Check if an autocomplete record is already present in the search box. If it is, do not perform the search again because the user is most
+                        //likely trying to select the field to type a new name
+                        if(!/^\w+, \w+ \(\d+\)$/i.test($('#search').val())){
+                            $.getJSON('{% url "ajax_search" %}',
+                                {
+                                    term:request.term,
+                                    acadYear:$('select[name="academicYear"]').val()
+                                }
+                            ).done(function(data){
+                                response(data);
+                            });
+                        }
                     },
                     minLength:2,
+                    delay:700,
                     select:function(event, ui){
                         $('#search').val(ui.item.value);
                         $('input[name="searchID"]').val(ui.item.id);
@@ -330,16 +331,16 @@
             body {min-width:900px;max-width:1200px;margin:10px auto;/*padding:0px;font-size:12px;*/}
             .buffer {width:80%;float:left;}
             form#mainSearchForm {
-				padding: 5px 15px;
-			}
-			legend {
-				margin: 0px 10px;
-				padding: 0px 8px;
-				font-size: 1.2em;
-				font-weight: bold;
-			}
+                padding: 5px 15px;
+            }
+            legend {
+                margin: 0px 10px;
+                padding: 0px 8px;
+                font-size: 1.2em;
+                font-weight: bold;
+            }
 
-			.personDetail {padding-left:10px;margin-top:15px;}
+            .personDetail {padding-left:10px;margin-top:15px;}
                 .personDetail h3 {padding-top:10px;clear:both;}
                 .personDetail .infoField {float:left;width:140px;}
                 .personDetail .wideField {float:left;width:210px;}
